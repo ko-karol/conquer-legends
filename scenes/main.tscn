@@ -4,6 +4,7 @@
 [ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="2_hud"]
 [ext_resource type="Script" uid="uid://b6ufcg6qpuc8t" path="res://scenes/floor/floor.gd" id="3_floor"]
 [ext_resource type="PackedScene" uid="uid://c4qvw8yc5qsxy" path="res://scenes/player/player.tscn" id="4_jyhfs"]
+[ext_resource type="PackedScene" uid="uid://bc1c613ljw68" path="res://scenes/monsters/monster.tscn" id="5_tbgi4"]
 
 [node name="Main" type="Node2D" unique_id=623160555]
 script = ExtResource("1_main")
@@ -17,4 +18,7 @@ script = ExtResource("3_floor")
 [node name="HUD" parent="." unique_id=1963526738 instance=ExtResource("2_hud")]
 
 [node name="Player" parent="." unique_id=1619409908 instance=ExtResource("4_jyhfs")]
-position = Vector2(95, 171)
+position = Vector2(-102, 149)
+
+[node name="Monster" parent="." unique_id=1898215015 instance=ExtResource("5_tbgi4")]
+position = Vector2(-328, 22)

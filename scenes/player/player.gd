@@ -9,16 +9,11 @@ var max_hp: float = 500.0
 var hp: float = 500.0
 var max_mp: float = 300.0
 var mp: float = 300.0
-var attack: float = 50.0
-var defense: float = 20.0
 var exp: float = 0.0
 var exp_to_next: float = 100.0
 
-# Damage and crit stats
-var min_damage_percent: float = 0.8  # 80% of attack as min damage
-var max_damage_percent: float = 1.2  # 120% of attack as max damage
-var crit_chance: float = 0.15  # 15% crit chance
-var crit_damage_multiplier: float = 1.5  # 150% damage on crit
+# Combat component handles attack, defense, damage calculation
+var combat: CombatComponent = null
 
 # Movement constants (lines 95-100)
 const MAX_SPEED: float = 200.0
@@ -49,12 +44,7 @@ var selected_target: Node2D = null
 const HP_REGEN: float = 1.0  # per second
 const MP_REGEN: float = 5.0  # per second
 
-# Projectile scene
-var arrow_scene: PackedScene = null
-
-# Sound effects (preloaded)
-#const ATTACK_SOUND = preload("res://assets/sounds/arrow_shoot.ogg")
-#const LEVELUP_SOUND = preload("res://assets/sounds/levelup.ogg")
+# Note: All resources now loaded via ResourceManager singleton
 
 # Movement state
 enum State { IDLE, MOVING, JUMPING, ATTACKING }
@@ -87,12 +77,14 @@ var queued_action: Dictionary = {}
 @onready var levelup_sound: AudioStreamPlayer = $LevelUpSound
 
 func _ready() -> void:
-	# Load arrow scene
-	arrow_scene = preload("res://scenes/projectiles/arrow.tscn")
+	# Initialize combat component
+	combat = CombatComponent.new(self)
+	combat.setup(50.0, 20.0, 0.15, 1.5)  # attack, defense, crit_chance, crit_mult
+	add_child(combat)
 	
-	# Load sound effects
-	attack_sound.stream = load("res://assets/sounds/arrow_shoot.ogg")
-	levelup_sound.stream = load("res://assets/sounds/levelup.ogg")
+	# Load sound effects from ResourceManager
+	attack_sound.stream = ResourceManager.get_sound("arrow_shoot")
+	levelup_sound.stream = ResourceManager.get_sound("levelup")
 	
 	# Start at world center
 	position = Isometric.world_to_iso(GameManager.WORLD_CENTER)
@@ -106,8 +98,16 @@ func _physics_process(delta: float) -> void:
 	scatter_level = level / 5
 	
 	# Regen HP/MP
+	var old_hp = hp
+	var old_mp = mp
 	hp = min(hp + HP_REGEN * delta, max_hp)
 	mp = min(mp + MP_REGEN * delta, max_mp)
+	
+	# Emit events if values changed significantly (every 1 HP/MP to avoid spam)
+	if floor(hp) != floor(old_hp):
+		EventBus.player_hp_changed.emit(hp, max_hp)
+	if floor(mp) != floor(old_mp):
+		EventBus.player_mp_changed.emit(mp, max_mp)
 	
 	# Update cooldowns
 	if scatter_cooldown_timer > 0:
@@ -254,16 +254,18 @@ func _process_queued_action() -> void:
 			jump_to(action["target"])
 
 func take_damage(damage: float) -> void:
-	var actual_damage = max(1, damage - defense)
+	var actual_damage = combat.apply_damage(damage, false)
 	hp = max(0, hp - actual_damage)
+	
+	# Emit damage event
+	EventBus.emit_damage(actual_damage, self, null, false)
+	EventBus.player_hp_changed.emit(hp, max_hp)
 	
 	# Flash damage effect
 	_flash_damage()
 	
-	# Screen shake when player is hit
-	var main_scene = get_parent()
-	if main_scene.has_method("shake_camera"):
-		main_scene.shake_camera(5.0)
+	# Request screen shake via event bus
+	EventBus.shake_camera(5.0)
 	
 	print("Player took %.0f damage (HP: %.0f/%.0f)" % [actual_damage, hp, max_hp])
 
@@ -283,6 +285,7 @@ func _flash_damage() -> void:
 
 func gain_exp(amount: float) -> void:
 	exp += amount
+	EventBus.player_gained_exp.emit(amount)
 	while exp >= exp_to_next:
 		_level_up()
 
@@ -292,14 +295,18 @@ func _level_up() -> void:
 	exp_to_next = 100 * pow(1.15, level - 1)
 	
 	# Increase stats (lines 73-74)
-	attack += 8
-	defense += 3
+	combat.increase_attack(8)
+	combat.increase_defense(3)
 	max_hp += 50
 	max_mp += 30
 	hp = max_hp
 	mp = max_mp
 	
 	print("LEVEL UP! Now level %d" % level)
+	
+	# Emit level up event
+	EventBus.player_leveled_up.emit(level)
+	EventBus.player_stats_changed.emit(self)
 	
 	# Play level up sound
 	levelup_sound.play()
@@ -308,33 +315,12 @@ func _level_up() -> void:
 	_spawn_levelup_particles()
 
 func _spawn_levelup_particles() -> void:
-	var levelup_scene = preload("res://scenes/effects/levelup_burst.tscn")
-	var particles = levelup_scene.instantiate()
-	get_parent().add_child(particles)
-	particles.position = position
-	particles.emitting = true
-	
-	# Auto-remove after lifetime
-	await get_tree().create_timer(particles.lifetime + 0.1).timeout
-	if is_instance_valid(particles):
-		particles.queue_free()
-
-# Combat functions
-func calculate_damage(base_attack: float) -> Dictionary:
-	"""Calculate damage with min-max range and crit chance. Returns {damage: float, is_crit: bool}"""
-	var min_dmg = base_attack * min_damage_percent
-	var max_dmg = base_attack * max_damage_percent
-	var damage = randf_range(min_dmg, max_dmg)
-	
-	# Check for crit
-	var is_crit = randf() < crit_chance
-	if is_crit:
-		damage *= crit_damage_multiplier
-	
-	return {"damage": damage, "is_crit": is_crit}
+	# Request particles via event bus
+	var world_pos = Isometric.iso_to_world(position)
+	EventBus.spawn_particles("levelup_burst", world_pos)
 
 func normal_attack(target_monster: Node2D) -> void:
-	if not arrow_scene or not is_instance_valid(target_monster):
+	if not is_instance_valid(target_monster):
 		return
 	
 	# Check range
@@ -343,10 +329,16 @@ func normal_attack(target_monster: Node2D) -> void:
 		print("Target out of range")
 		return
 	
-	# Calculate damage with min-max and crit
-	var damage_result = calculate_damage(attack)
+	# Calculate damage with min-max and crit using combat component
+	var damage_result = combat.calculate_damage()
 	var final_damage = damage_result["damage"]
 	var is_crit = damage_result["is_crit"]
+	
+	# Calculate direction
+	var direction = (target_monster.position - position).normalized()
+	
+	# Update facing
+	facing_angle = direction.angle()
 	
 	# Play attack sound
 	attack_sound.play()
@@ -355,30 +347,18 @@ func normal_attack(target_monster: Node2D) -> void:
 	_spawn_muzzle_flash()
 	
 	# Fire arrow projectile
-	var arrow = arrow_scene.instantiate()
-	get_parent().add_child(arrow)
-	
-	var direction = (target_monster.position - position).normalized()
-	arrow.setup(position, direction, final_damage, false, Vector2.ZERO, is_crit)
-	
-	# Update facing
-	facing_angle = direction.angle()
+	var arrow = ResourceManager.instantiate_scene("arrow")
+	if arrow:
+		get_parent().add_child(arrow)
+		arrow.setup(position, direction, final_damage, false, Vector2.ZERO, is_crit)
 	
 	var crit_text = " CRIT!" if is_crit else ""
 	print("Normal attack: %.0f damage%s" % [final_damage, crit_text])
 
 func _spawn_muzzle_flash() -> void:
-	var muzzle_scene = preload("res://scenes/effects/muzzle_flash.tscn")
-	var particles = muzzle_scene.instantiate()
-	get_parent().add_child(particles)
-	particles.position = position
-	particles.rotation = facing_angle
-	particles.emitting = true
-	
-	# Auto-remove after lifetime
-	await get_tree().create_timer(particles.lifetime + 0.1).timeout
-	if is_instance_valid(particles):
-		particles.queue_free()
+	# Request particles via event bus
+	var world_pos = Isometric.iso_to_world(position)
+	EventBus.spawn_particles("muzzle_flash", world_pos)
 
 func scatter_skill(world_target: Vector2) -> void:
 	# Check cooldown
@@ -395,10 +375,14 @@ func scatter_skill(world_target: Vector2) -> void:
 	mp -= SCATTER_MP_COST
 	scatter_cooldown_timer = SCATTER_COOLDOWN
 	
+	# Emit MP change and cooldown events
+	EventBus.player_mp_changed.emit(mp, max_mp)
+	EventBus.skill_cooldown_changed.emit("scatter", scatter_cooldown_timer)
+	
 	# Calculate scatter parameters (from context lines 119-126)
 	var num_arrows = 355 + scatter_level
 	var spread_angle = 0.8 + scatter_level * 0.1
-	var scatter_damage = attack * (0.8 + scatter_level * 0.1)
+	var scatter_damage = combat.get_attack() * (0.8 + scatter_level * 0.1)
 	
 	# Direction to target (center of fan)
 	var iso_target = Isometric.world_to_iso(world_target)
@@ -449,8 +433,8 @@ func scatter_skill(world_target: Vector2) -> void:
 		var monster = valid_targets[i]
 		hit_monsters.append(monster)
 		
-		# Calculate damage with min-max and crit for each arrow
-		var damage_result = calculate_damage(scatter_damage)
+		# Calculate damage with min-max and crit for each arrow using combat component
+		var damage_result = combat.calculate_damage(scatter_damage)
 		var final_damage = damage_result["damage"]
 		var is_crit = damage_result["is_crit"]
 		
@@ -462,8 +446,8 @@ func scatter_skill(world_target: Vector2) -> void:
 		monster.take_damage(final_damage, is_crit)
 		
 		# Spawn ONE visual arrow flying directly toward THIS monster
-		if arrow_scene:
-			var visual_arrow = arrow_scene.instantiate()
+		var visual_arrow = ResourceManager.instantiate_scene("arrow")
+		if visual_arrow:
 			get_parent().add_child(visual_arrow)
 			var direction_to_monster = (monster.position - position).normalized()
 			visual_arrow.setup(position, direction_to_monster, 0, true, monster.position)  # visual_only = true, stops at monster
@@ -471,6 +455,9 @@ func scatter_skill(world_target: Vector2) -> void:
 	var avg_damage = total_damage / hit_count if hit_count > 0 else 0
 	var crit_text = " (%d crits)" % crit_count if crit_count > 0 else ""
 	print("Scatter: %d arrows at %d monsters, avg %.0f damage%s" % [hit_count, hit_monsters.size(), avg_damage, crit_text])
+	
+	# Emit scatter used event
+	EventBus.player_scatter_used.emit(hit_count, total_damage)
 
 # Target selection functions (Conquer Online style)
 func select_target(target: Node2D) -> void:
@@ -485,12 +472,19 @@ func select_target(target: Node2D) -> void:
 	if is_instance_valid(selected_target) and selected_target.has_method("set_selected"):
 		selected_target.set_selected(true)
 	
+	# Emit target change event
+	EventBus.player_target_changed.emit(target)
+	
 	print("Target selected: %s" % (target.name if is_instance_valid(target) else "None"))
 
 func clear_target() -> void:
 	if is_instance_valid(selected_target) and selected_target.has_method("set_selected"):
 		selected_target.set_selected(false)
 	selected_target = null
+	
+	# Emit target cleared event
+	EventBus.player_target_changed.emit(null)
+	
 	print("Target cleared")
 
 func _process_auto_attack(delta: float) -> void:
@@ -520,8 +514,14 @@ func _process_auto_attack(delta: float) -> void:
 
 func _execute_attack(target_monster: Node2D) -> void:
 	"""Execute attack on target (shared by manual and auto-attack)"""
-	if not arrow_scene or not is_instance_valid(target_monster):
+	if not is_instance_valid(target_monster):
 		return
+	
+	# Calculate direction
+	var direction = (target_monster.position - position).normalized()
+	
+	# Update facing
+	facing_angle = direction.angle()
 	
 	# Play attack sound
 	attack_sound.play()
@@ -530,11 +530,7 @@ func _execute_attack(target_monster: Node2D) -> void:
 	_spawn_muzzle_flash()
 	
 	# Fire arrow projectile
-	var arrow = arrow_scene.instantiate()
-	get_parent().add_child(arrow)
-	
-	var direction = (target_monster.position - position).normalized()
-	arrow.setup(position, direction, attack, false)
-	
-	# Update facing
-	facing_angle = direction.angle()
+	var arrow = ResourceManager.instantiate_scene("arrow")
+	if arrow:
+		get_parent().add_child(arrow)
+		arrow.setup(position, direction, combat.get_attack(), false)

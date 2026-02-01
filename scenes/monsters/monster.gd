@@ -81,9 +81,7 @@ const WANDER_WAIT_MAX = 3.0
 # Level scaling (1.12x per level)
 const LEVEL_MULTIPLIER = 1.12
 
-# Sound effects (preloaded)
-#const HIT_SOUND = preload("res://assets/sounds/hit.ogg")
-#const DEATH_SOUND = preload("res://assets/sounds/death.ogg")
+# Note: All resources now loaded via ResourceManager singleton
 
 # AI States
 enum State { WANDER, CHASE, ATTACK, RETURN, DEAD }
@@ -93,11 +91,13 @@ var monster_type: int = GameManager.MonsterType.PHEASANT
 var level: int = 1
 var max_hp: float = 30.0
 var hp: float = 30.0
-var attack: float = 5.0
 var exp_reward: float = 8.0
 var move_speed: float = 40.0
 var size: float = 18.0
 var color: Color = Color.WHITE
+
+# Combat component (optional - monsters use simple stats for now)
+var combat: CombatComponent = null
 
 # AI state
 var current_state: State = State.WANDER
@@ -138,11 +138,16 @@ func initialize(type: int, spawn_level: int, world_spawn_pos: Vector2) -> void:
 	var scale_factor = pow(LEVEL_MULTIPLIER, level - 1)
 	max_hp = stats["base_hp"] * scale_factor
 	hp = max_hp
-	attack = stats["base_atk"] * scale_factor
+	var attack_value = stats["base_atk"] * scale_factor
 	exp_reward = stats["base_exp"] * scale_factor
 	move_speed = stats["speed"]
 	size = stats["size"]
 	color = stats["color"]
+	
+	# Initialize combat component for monsters
+	combat = CombatComponent.new(self)
+	combat.setup(attack_value, 0.0, 0.05, 1.3)  # Lower crit chance/mult for monsters
+	add_child(combat)
 	
 	# Set spawn position
 	var iso_pos = Isometric.world_to_iso(world_spawn_pos)
@@ -155,15 +160,18 @@ func initialize(type: int, spawn_level: int, world_spawn_pos: Vector2) -> void:
 	# Setup collision shapes
 	_setup_collision()
 	
-	# Load sound effects
-	hit_sound.stream = load("res://assets/sounds/hit.ogg")
-	death_sound.stream = load("res://assets/sounds/death.ogg")
+	# Load sound effects from ResourceManager
+	hit_sound.stream = ResourceManager.get_sound("hit")
+	death_sound.stream = ResourceManager.get_sound("death")
 	
 	# Register with GameManager
 	GameManager.register_monster(self)
 	
 	# Add to monsters group for scatter targeting
 	add_to_group("monsters")
+	
+	# Emit spawn event
+	EventBus.monster_spawned.emit(self, monster_type, level)
 	
 	# Start wandering
 	current_state = State.WANDER
@@ -338,6 +346,9 @@ func take_damage(damage: float, is_crit: bool = false) -> void:
 	
 	hp = max(0, hp - damage)
 	
+	# Emit damage event
+	EventBus.emit_damage(damage, self, null, is_crit)
+	
 	# Play hit sound
 	hit_sound.play()
 	
@@ -354,11 +365,8 @@ func take_damage(damage: float, is_crit: bool = false) -> void:
 		_die()
 
 func _show_damage_number(damage: float, is_crit: bool = false) -> void:
-	var damage_number_scene = preload("res://scenes/effects/damage_number.tscn")
-	var damage_number = damage_number_scene.instantiate()
-	get_parent().add_child(damage_number)
-	damage_number.position = position + Vector2(0, -size - 10)
-	damage_number.setup(damage, is_crit)
+	# Request damage number via event bus
+	EventBus.damage_number_requested.emit(damage, position + Vector2(0, -size - 10), is_crit)
 
 func _flash_damage() -> void:
 	# Flash white and scale slightly
@@ -403,39 +411,31 @@ func _die() -> void:
 			player.gain_exp(exp_reward)
 			print("%s killed! Player gained %.0f EXP" % [MONSTER_STATS[monster_type]["name"], exp_reward])
 	
+	# Emit death event
+	EventBus.emit_death(self, null)
+	
 	# TODO: Phase 5 - drop gold
 	
 	# Unregister and remove after animation
 	GameManager.unregister_monster(self)
+	EventBus.monster_despawned.emit(self)
 	await tween.finished
 	queue_free()
 
 func _spawn_hit_particles() -> void:
-	var hit_particles_scene = preload("res://scenes/effects/hit_particles.tscn")
-	var particles = hit_particles_scene.instantiate()
-	get_parent().add_child(particles)
-	particles.position = position
-	particles.emitting = true
-	
-	# Auto-remove after lifetime
-	await get_tree().create_timer(particles.lifetime + 0.1).timeout
-	if is_instance_valid(particles):
-		particles.queue_free()
+	# Request particles via event bus
+	var world_pos = Isometric.iso_to_world(position)
+	EventBus.spawn_particles("hit_particles", world_pos)
 
 func _spawn_death_particles() -> void:
-	var death_particles_scene = preload("res://scenes/effects/death_burst.tscn")
-	var particles = death_particles_scene.instantiate()
-	get_parent().add_child(particles)
-	particles.position = position
-	particles.emitting = true
-	
-	# Auto-remove after lifetime
-	await get_tree().create_timer(particles.lifetime + 0.1).timeout
-	if is_instance_valid(particles):
-		particles.queue_free()
+	# Request particles via event bus
+	var world_pos = Isometric.iso_to_world(position)
+	EventBus.spawn_particles("death_burst", world_pos)
 
 func _exit_tree() -> void:
 	GameManager.unregister_monster(self)
+	if current_state != State.DEAD:
+		EventBus.monster_despawned.emit(self)
 
 func set_selected(selected: bool) -> void:
 	"""Called by player to mark this as selected target (no visual indicator)"""

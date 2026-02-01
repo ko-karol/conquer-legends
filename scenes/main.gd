@@ -36,6 +36,11 @@ func _ready() -> void:
 	# Add player to group for monster aggro
 	if player:
 		player.add_to_group("player")
+	
+	# Connect to event bus
+	EventBus.camera_shake_requested.connect(_on_camera_shake_requested)
+	EventBus.particle_spawn_requested.connect(_on_particle_spawn_requested)
+	EventBus.damage_number_requested.connect(_on_damage_number_requested)
 
 func _input(event: InputEvent) -> void:
 	# Handle zoom controls
@@ -162,6 +167,32 @@ func _process(delta: float) -> void:
 
 func shake_camera(amount: float) -> void:
 	shake_amount = amount
+
+# Event handlers
+
+func _on_camera_shake_requested(amount: float) -> void:
+	shake_camera(amount)
+
+func _on_particle_spawn_requested(particle_type: String, world_pos: Vector2) -> void:
+	var particles = ResourceManager.instantiate_scene(particle_type)
+	if particles:
+		var iso_pos = Isometric.world_to_iso(world_pos)
+		add_child(particles)
+		particles.position = iso_pos
+		particles.emitting = true
+		
+		# Auto-remove after lifetime
+		if "lifetime" in particles:
+			await get_tree().create_timer(particles.lifetime + 0.1).timeout
+			if is_instance_valid(particles):
+				particles.queue_free()
+
+func _on_damage_number_requested(damage: float, iso_pos: Vector2, is_crit: bool) -> void:
+	var damage_number = ResourceManager.instantiate_scene("damage_number")
+	if damage_number:
+		add_child(damage_number)
+		damage_number.position = iso_pos
+		damage_number.setup(damage, is_crit)
 
 func _get_monster_at_position(screen_pos: Vector2) -> Node2D:
 	# Check if click is on a monster

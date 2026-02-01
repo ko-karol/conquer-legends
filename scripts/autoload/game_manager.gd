@@ -30,14 +30,12 @@ var active_monsters: Array = []
 var max_monsters: int = 1500
 
 # Monster spawning
-var monster_scene: PackedScene = null
 var spawned_zones: Dictionary = {}  # Track monsters per zone
 var world_root: Node2D = null  # Reference to main scene for spawning
 
 func _ready() -> void:
 	print("GameManager initialized")
 	_create_spawn_zones()
-	monster_scene = preload("res://scenes/monsters/monster.tscn")
 
 func _create_spawn_zones() -> void:
 	# Generate spawn zones on grid with 1500 unit spacing
@@ -132,9 +130,11 @@ func get_zones_near_position(pos: Vector2, radius: float) -> Array:
 func register_monster(monster: Node2D) -> void:
 	if not active_monsters.has(monster):
 		active_monsters.append(monster)
+		# Note: spawn event emitted in monster.initialize()
 
 func unregister_monster(monster: Node2D) -> void:
 	active_monsters.erase(monster)
+	# Note: despawn event emitted in monster code
 
 func get_monster_count() -> int:
 	return active_monsters.size()
@@ -143,7 +143,7 @@ func set_world_root(root: Node2D) -> void:
 	world_root = root
 
 func spawn_monsters_near_player(player_world_pos: Vector2) -> void:
-	if not world_root or not monster_scene:
+	if not world_root:
 		return
 	
 	# Get zones near player (spawn radius: 2000 units)
@@ -187,12 +187,13 @@ func _spawn_monsters_in_zone(zone: Dictionary, count: int, zone_key: String) -> 
 		var spawn_pos = zone["position"] + spawn_offset
 		
 		# Instantiate monster
-		var monster = monster_scene.instantiate()
-		world_root.add_child(monster)
-		monster.initialize(monster_type, level, spawn_pos)
-		
-		# Track in zone
-		spawned_zones[zone_key].append(monster)
+		var monster = ResourceManager.instantiate_scene("monster")
+		if monster:
+			world_root.add_child(monster)
+			monster.initialize(monster_type, level, spawn_pos)
+			
+			# Track in zone
+			spawned_zones[zone_key].append(monster)
 
 func cleanup_distant_monsters(player_world_pos: Vector2, cleanup_radius: float = 3000) -> void:
 	# Remove monsters far from player to maintain performance
