@@ -1,0 +1,540 @@
+extends CharacterBody2D
+
+# Player character with click-to-move, jump, and combat
+# Based on Pygame implementation (GODOT_MIGRATION_CONTEXT.md)
+
+# Player stats (starting values from lines 70-78)
+@export var level: int = 1
+var max_hp: float = 500.0
+var hp: float = 500.0
+var max_mp: float = 300.0
+var mp: float = 300.0
+var attack: float = 50.0
+var defense: float = 20.0
+var exp: float = 0.0
+var exp_to_next: float = 100.0
+
+# Damage and crit stats
+var min_damage_percent: float = 0.8  # 80% of attack as min damage
+var max_damage_percent: float = 1.2  # 120% of attack as max damage
+var crit_chance: float = 0.15  # 15% crit chance
+var crit_damage_multiplier: float = 1.5  # 150% damage on crit
+
+# Movement constants (lines 95-100)
+const MAX_SPEED: float = 200.0
+const ACCELERATION: float = 1500.0
+const DECELERATION: float = 2000.0
+const DECEL_DISTANCE: float = 150.0
+const STOP_THRESHOLD: float = 5.0
+
+# Jump constants (lines 102-107)
+const JUMP_INITIAL_VZ: float = 350.0
+const GRAVITY: float = 800.0
+const JUMP_MAX_DISTANCE: float = 300.0
+
+# Combat constants
+const ATTACK_RANGE: float = 350.0
+const SCATTER_RANGE: float = 400.0
+const SCATTER_MP_COST: float = 5.0
+const SCATTER_COOLDOWN: float = 0.4
+const AUTO_ATTACK_COOLDOWN: float = 0.8
+var scatter_level: int = 10
+var scatter_cooldown_timer: float = 0.0
+var auto_attack_timer: float = 0.0
+
+# Target selection (Conquer Online style)
+var selected_target: Node2D = null
+
+# Regen rates
+const HP_REGEN: float = 1.0  # per second
+const MP_REGEN: float = 5.0  # per second
+
+# Projectile scene
+var arrow_scene: PackedScene = null
+
+# Sound effects (preloaded)
+#const ATTACK_SOUND = preload("res://assets/sounds/arrow_shoot.ogg")
+#const LEVELUP_SOUND = preload("res://assets/sounds/levelup.ogg")
+
+# Movement state
+enum State { IDLE, MOVING, JUMPING, ATTACKING }
+var current_state: State = State.IDLE
+
+var target_pos: Vector2 = Vector2.ZERO
+var move_direction: Vector2 = Vector2.ZERO
+var current_speed: float = 0.0
+var facing_angle: float = 0.0
+
+# Jump state
+var is_jumping: bool = false
+var jump_start_pos: Vector2 = Vector2.ZERO
+var jump_target_pos: Vector2 = Vector2.ZERO
+var jump_horizontal_velocity: Vector2 = Vector2.ZERO
+var jump_vz: float = 0.0  # Vertical velocity (Z-axis)
+var jump_z: float = 0.0   # Current Z height
+
+# Input queue
+var queued_action: Dictionary = {}
+
+# Visual elements
+@onready var visual: Node2D = $Visual
+@onready var body_shape: Polygon2D = $Visual/Body
+@onready var weapon_shape: Polygon2D = $Visual/Weapon
+@onready var shadow_shape: Polygon2D = $Visual/Shadow
+
+# Audio
+@onready var attack_sound: AudioStreamPlayer = $AttackSound
+@onready var levelup_sound: AudioStreamPlayer = $LevelUpSound
+
+func _ready() -> void:
+	# Load arrow scene
+	arrow_scene = preload("res://scenes/projectiles/arrow.tscn")
+	
+	# Load sound effects
+	attack_sound.stream = load("res://assets/sounds/arrow_shoot.ogg")
+	levelup_sound.stream = load("res://assets/sounds/levelup.ogg")
+	
+	# Start at world center
+	position = Isometric.world_to_iso(GameManager.WORLD_CENTER)
+	
+	print("Player spawned at world position: %s" % GameManager.WORLD_CENTER)
+
+
+
+func _physics_process(delta: float) -> void:
+	# Update scatter level based on player level (every 5 levels)
+	scatter_level = level / 5
+	
+	# Regen HP/MP
+	hp = min(hp + HP_REGEN * delta, max_hp)
+	mp = min(mp + MP_REGEN * delta, max_mp)
+	
+	# Update cooldowns
+	if scatter_cooldown_timer > 0:
+		scatter_cooldown_timer -= delta
+	if auto_attack_timer > 0:
+		auto_attack_timer -= delta
+	
+	# Auto-attack selected target
+	_process_auto_attack(delta)
+	
+	# Update state machine
+	match current_state:
+		State.IDLE:
+			_physics_idle(delta)
+		State.MOVING:
+			_physics_moving(delta)
+		State.JUMPING:
+			_physics_jumping(delta)
+		State.ATTACKING:
+			_physics_attacking(delta)
+	
+	# Update facing direction visual
+	_update_facing_visual()
+
+func _physics_idle(delta: float) -> void:
+	# Decelerate to stop
+	if current_speed > 0:
+		current_speed = max(0, current_speed - DECELERATION * delta)
+		velocity = move_direction * current_speed
+		move_and_slide()
+
+func _physics_moving(delta: float) -> void:
+	# Calculate distance to target
+	var to_target = target_pos - position
+	var distance = to_target.length()
+	
+	# Check if reached target
+	if distance < STOP_THRESHOLD:
+		current_state = State.IDLE
+		current_speed = 0
+		velocity = Vector2.ZERO
+		_process_queued_action()
+		return
+	
+	# Update direction
+	move_direction = to_target.normalized()
+	facing_angle = move_direction.angle()
+	
+	# Calculate speed based on distance (decelerate near target)
+	if distance < DECEL_DISTANCE:
+		# Ease out
+		var target_speed = (distance / DECEL_DISTANCE) * MAX_SPEED
+		if current_speed > target_speed:
+			current_speed = max(target_speed, current_speed - DECELERATION * delta)
+		else:
+			current_speed = min(target_speed, current_speed + ACCELERATION * delta)
+	else:
+		# Accelerate to max speed
+		current_speed = min(MAX_SPEED, current_speed + ACCELERATION * delta)
+	
+	# Apply movement
+	velocity = move_direction * current_speed
+	move_and_slide()
+
+func _physics_jumping(delta: float) -> void:
+	# Update jump physics (vertical)
+	jump_vz -= GRAVITY * delta
+	jump_z += jump_vz * delta
+	
+	# Horizontal movement
+	velocity = jump_horizontal_velocity
+	move_and_slide()
+	
+	# Check if landed
+	if jump_z <= 0:
+		jump_z = 0
+		is_jumping = false
+		current_state = State.IDLE
+		_process_queued_action()
+	
+	# Update visual Y offset for jump height
+	visual.position.y = -jump_z
+
+func _physics_attacking(delta: float) -> void:
+	# Placeholder for attack state (Phase 5)
+	pass
+
+func _update_facing_visual() -> void:
+	# Rotate weapon to face direction
+	weapon_shape.rotation = facing_angle
+
+func move_to(world_target: Vector2) -> void:
+	# Queue move if busy, otherwise execute
+	if current_state == State.JUMPING or current_state == State.ATTACKING:
+		queued_action = {"type": "move", "target": world_target}
+		return
+	
+	var iso_target = Isometric.world_to_iso(world_target)
+	target_pos = iso_target
+	current_state = State.MOVING
+	print("Moving to world pos: %s (iso: %s)" % [world_target, iso_target])
+
+func jump_to(world_target: Vector2) -> void:
+	# Queue jump if busy, otherwise execute
+	if current_state == State.JUMPING or current_state == State.ATTACKING:
+		queued_action = {"type": "jump", "target": world_target}
+		return
+	
+	var iso_target = Isometric.world_to_iso(world_target)
+	var jump_distance = position.distance_to(iso_target)
+	
+	# Limit jump distance
+	if jump_distance > JUMP_MAX_DISTANCE:
+		var direction = (iso_target - position).normalized()
+		iso_target = position + direction * JUMP_MAX_DISTANCE
+	
+	# Calculate jump parameters
+	jump_start_pos = position
+	jump_target_pos = iso_target
+	jump_vz = JUMP_INITIAL_VZ
+	jump_z = 0
+	
+	# Calculate horizontal velocity to reach target during jump arc
+	var jump_time = 2.0 * JUMP_INITIAL_VZ / GRAVITY  # Time to peak and back
+	jump_horizontal_velocity = (jump_target_pos - jump_start_pos) / jump_time
+	
+	is_jumping = true
+	current_state = State.JUMPING
+	facing_angle = jump_horizontal_velocity.angle()
+	
+	print("Jumping to world pos (distance: %.1f)" % jump_distance)
+
+func _process_queued_action() -> void:
+	if queued_action.is_empty():
+		return
+	
+	var action = queued_action
+	queued_action = {}
+	
+	match action["type"]:
+		"move":
+			move_to(action["target"])
+		"jump":
+			jump_to(action["target"])
+
+func take_damage(damage: float) -> void:
+	var actual_damage = max(1, damage - defense)
+	hp = max(0, hp - actual_damage)
+	
+	# Flash damage effect
+	_flash_damage()
+	
+	# Screen shake when player is hit
+	var main_scene = get_parent()
+	if main_scene.has_method("shake_camera"):
+		main_scene.shake_camera(5.0)
+	
+	print("Player took %.0f damage (HP: %.0f/%.0f)" % [actual_damage, hp, max_hp])
+
+func _flash_damage() -> void:
+	# Flash red and pulse
+	var original_scale = visual.scale
+	var tween = create_tween()
+	tween.set_parallel(true)
+	
+	# Flash to red
+	tween.tween_property(body_shape, "modulate", Color(1, 0.3, 0.3, 1), 0.05)
+	tween.tween_property(body_shape, "modulate", Color(1, 1, 1, 1), 0.15).set_delay(0.05)
+	
+	# Pulse scale slightly
+	tween.tween_property(visual, "scale", original_scale * 1.1, 0.05)
+	tween.tween_property(visual, "scale", original_scale, 0.15).set_delay(0.05)
+
+func gain_exp(amount: float) -> void:
+	exp += amount
+	while exp >= exp_to_next:
+		_level_up()
+
+func _level_up() -> void:
+	level += 1
+	exp -= exp_to_next
+	exp_to_next = 100 * pow(1.15, level - 1)
+	
+	# Increase stats (lines 73-74)
+	attack += 8
+	defense += 3
+	max_hp += 50
+	max_mp += 30
+	hp = max_hp
+	mp = max_mp
+	
+	print("LEVEL UP! Now level %d" % level)
+	
+	# Play level up sound
+	levelup_sound.play()
+	
+	# Spawn level-up particles
+	_spawn_levelup_particles()
+
+func _spawn_levelup_particles() -> void:
+	var levelup_scene = preload("res://scenes/effects/levelup_burst.tscn")
+	var particles = levelup_scene.instantiate()
+	get_parent().add_child(particles)
+	particles.position = position
+	particles.emitting = true
+	
+	# Auto-remove after lifetime
+	await get_tree().create_timer(particles.lifetime + 0.1).timeout
+	if is_instance_valid(particles):
+		particles.queue_free()
+
+# Combat functions
+func calculate_damage(base_attack: float) -> Dictionary:
+	"""Calculate damage with min-max range and crit chance. Returns {damage: float, is_crit: bool}"""
+	var min_dmg = base_attack * min_damage_percent
+	var max_dmg = base_attack * max_damage_percent
+	var damage = randf_range(min_dmg, max_dmg)
+	
+	# Check for crit
+	var is_crit = randf() < crit_chance
+	if is_crit:
+		damage *= crit_damage_multiplier
+	
+	return {"damage": damage, "is_crit": is_crit}
+
+func normal_attack(target_monster: Node2D) -> void:
+	if not arrow_scene or not is_instance_valid(target_monster):
+		return
+	
+	# Check range
+	var distance = position.distance_to(target_monster.position)
+	if distance > ATTACK_RANGE:
+		print("Target out of range")
+		return
+	
+	# Calculate damage with min-max and crit
+	var damage_result = calculate_damage(attack)
+	var final_damage = damage_result["damage"]
+	var is_crit = damage_result["is_crit"]
+	
+	# Play attack sound
+	attack_sound.play()
+	
+	# Spawn muzzle flash
+	_spawn_muzzle_flash()
+	
+	# Fire arrow projectile
+	var arrow = arrow_scene.instantiate()
+	get_parent().add_child(arrow)
+	
+	var direction = (target_monster.position - position).normalized()
+	arrow.setup(position, direction, final_damage, false, Vector2.ZERO, is_crit)
+	
+	# Update facing
+	facing_angle = direction.angle()
+	
+	var crit_text = " CRIT!" if is_crit else ""
+	print("Normal attack: %.0f damage%s" % [final_damage, crit_text])
+
+func _spawn_muzzle_flash() -> void:
+	var muzzle_scene = preload("res://scenes/effects/muzzle_flash.tscn")
+	var particles = muzzle_scene.instantiate()
+	get_parent().add_child(particles)
+	particles.position = position
+	particles.rotation = facing_angle
+	particles.emitting = true
+	
+	# Auto-remove after lifetime
+	await get_tree().create_timer(particles.lifetime + 0.1).timeout
+	if is_instance_valid(particles):
+		particles.queue_free()
+
+func scatter_skill(world_target: Vector2) -> void:
+	# Check cooldown
+	if scatter_cooldown_timer > 0:
+		print("Scatter on cooldown (%.1fs)" % scatter_cooldown_timer)
+		return
+	
+	# Check MP
+	if mp < SCATTER_MP_COST:
+		print("Not enough MP")
+		return
+	
+	# Consume MP and start cooldown
+	mp -= SCATTER_MP_COST
+	scatter_cooldown_timer = SCATTER_COOLDOWN
+	
+	# Calculate scatter parameters (from context lines 119-126)
+	var num_arrows = 355 + scatter_level
+	var spread_angle = 0.8 + scatter_level * 0.1
+	var scatter_damage = attack * (0.8 + scatter_level * 0.1)
+	
+	# Direction to target (center of fan)
+	var iso_target = Isometric.world_to_iso(world_target)
+	var base_direction = (iso_target - position).normalized()
+	var base_angle = base_direction.angle()
+	
+	# Update facing
+	facing_angle = base_angle
+	
+	# Play attack sound
+	attack_sound.play()
+	
+	# Spawn muzzle flash for scatter
+	_spawn_muzzle_flash()
+	
+	# Find all monsters within the fan cone
+	var monsters = get_tree().get_nodes_in_group("monsters")
+	var valid_targets = []
+	
+	for monster in monsters:
+		if not is_instance_valid(monster):
+			continue
+		
+		var to_monster = monster.position - position
+		var distance = to_monster.length()
+		
+		# Check range
+		if distance > SCATTER_RANGE:
+			continue
+		
+		# Check if within fan angle
+		var monster_angle = to_monster.angle()
+		var angle_diff = abs(fmod(monster_angle - base_angle + PI, TAU) - PI)
+		
+		if angle_diff <= spread_angle / 2.0:
+			valid_targets.append(monster)
+	
+	# Sort by distance (closer first)
+	valid_targets.sort_custom(func(a, b): return position.distance_to(a.position) < position.distance_to(b.position))
+	
+	# Hit exactly num_arrows unique monsters (1 arrow per monster)
+	var hit_count = min(num_arrows, valid_targets.size())
+	var hit_monsters = []
+	var total_damage = 0.0
+	var crit_count = 0
+	
+	for i in range(hit_count):
+		var monster = valid_targets[i]
+		hit_monsters.append(monster)
+		
+		# Calculate damage with min-max and crit for each arrow
+		var damage_result = calculate_damage(scatter_damage)
+		var final_damage = damage_result["damage"]
+		var is_crit = damage_result["is_crit"]
+		
+		if is_crit:
+			crit_count += 1
+		total_damage += final_damage
+		
+		# Apply instant hitscan damage
+		monster.take_damage(final_damage, is_crit)
+		
+		# Spawn ONE visual arrow flying directly toward THIS monster
+		if arrow_scene:
+			var visual_arrow = arrow_scene.instantiate()
+			get_parent().add_child(visual_arrow)
+			var direction_to_monster = (monster.position - position).normalized()
+			visual_arrow.setup(position, direction_to_monster, 0, true, monster.position)  # visual_only = true, stops at monster
+	
+	var avg_damage = total_damage / hit_count if hit_count > 0 else 0
+	var crit_text = " (%d crits)" % crit_count if crit_count > 0 else ""
+	print("Scatter: %d arrows at %d monsters, avg %.0f damage%s" % [hit_count, hit_monsters.size(), avg_damage, crit_text])
+
+# Target selection functions (Conquer Online style)
+func select_target(target: Node2D) -> void:
+	# Clear previous target's selection
+	if is_instance_valid(selected_target) and selected_target.has_method("set_selected"):
+		selected_target.set_selected(false)
+	
+	# Set new target
+	selected_target = target
+	
+	# Show selection on target
+	if is_instance_valid(selected_target) and selected_target.has_method("set_selected"):
+		selected_target.set_selected(true)
+	
+	print("Target selected: %s" % (target.name if is_instance_valid(target) else "None"))
+
+func clear_target() -> void:
+	if is_instance_valid(selected_target) and selected_target.has_method("set_selected"):
+		selected_target.set_selected(false)
+	selected_target = null
+	print("Target cleared")
+
+func _process_auto_attack(delta: float) -> void:
+	# Check if we have a valid target
+	if not is_instance_valid(selected_target):
+		if selected_target != null:
+			selected_target = null
+		return
+	
+	# Don't auto-attack while jumping or attacking manually
+	if current_state == State.JUMPING:
+		return
+	
+	# Check if cooldown ready
+	if auto_attack_timer > 0:
+		return
+	
+	# Check range
+	var distance = position.distance_to(selected_target.position)
+	if distance > ATTACK_RANGE:
+		# Target too far, could optionally move closer here
+		return
+	
+	# Auto-attack!
+	_execute_attack(selected_target)
+	auto_attack_timer = AUTO_ATTACK_COOLDOWN
+
+func _execute_attack(target_monster: Node2D) -> void:
+	"""Execute attack on target (shared by manual and auto-attack)"""
+	if not arrow_scene or not is_instance_valid(target_monster):
+		return
+	
+	# Play attack sound
+	attack_sound.play()
+	
+	# Spawn muzzle flash
+	_spawn_muzzle_flash()
+	
+	# Fire arrow projectile
+	var arrow = arrow_scene.instantiate()
+	get_parent().add_child(arrow)
+	
+	var direction = (target_monster.position - position).normalized()
+	arrow.setup(position, direction, attack, false)
+	
+	# Update facing
+	facing_angle = direction.angle()

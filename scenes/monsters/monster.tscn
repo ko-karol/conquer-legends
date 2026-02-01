@@ -1,0 +1,64 @@
+[gd_scene format=3 uid="uid://bc1c613ljw68"]
+
+[ext_resource type="Script" path="res://scenes/monsters/monster.gd" id="1_monster"]
+
+[node name="Monster" type="CharacterBody2D"]
+collision_layer = 2
+collision_mask = 13
+script = ExtResource("1_monster")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+
+[node name="Visual" type="Node2D" parent="."]
+
+[node name="Shadow" type="Polygon2D" parent="Visual"]
+z_index = -1
+color = Color(0, 0, 0, 0.3)
+antialiased = true
+
+[node name="Body" type="Polygon2D" parent="Visual"]
+z_index = 0
+antialiased = true
+
+[node name="NameLabel" type="Label" parent="Visual"]
+offset_left = -50.0
+offset_top = -40.0
+offset_right = 50.0
+offset_bottom = -20.0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 12
+text = "Monster"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="HealthBarBg" type="ColorRect" parent="Visual"]
+offset_left = -25.0
+offset_top = -18.0
+offset_right = 25.0
+offset_bottom = -13.0
+color = Color(0.2, 0.2, 0.2, 0.8)
+
+[node name="HealthBarFill" type="ColorRect" parent="Visual"]
+offset_left = -25.0
+offset_top = -18.0
+offset_right = 25.0
+offset_bottom = -13.0
+color = Color(0.8, 0.1, 0.1, 1)
+
+[node name="AggroRange" type="Area2D" parent="."]
+collision_layer = 0
+collision_mask = 1
+
+[node name="AggroCollision" type="CollisionShape2D" parent="AggroRange"]
+
+[node name="AttackRange" type="Area2D" parent="."]
+collision_layer = 0
+collision_mask = 1
+
+[node name="AttackCollision" type="CollisionShape2D" parent="AttackRange"]
+
+[node name="HitSound" type="AudioStreamPlayer" parent="."]
+
+[node name="DeathSound" type="AudioStreamPlayer" parent="."]
