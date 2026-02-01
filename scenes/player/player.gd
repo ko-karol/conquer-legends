@@ -1,7 +1,11 @@
 extends CharacterBody2D
 
-# Player character with click-to-move, jump, and combat
-# Based on Pygame implementation (GODOT_MIGRATION_CONTEXT.md)
+## Player character with click-to-move, jump, and combat
+## Based on Pygame implementation (GODOT_MIGRATION_CONTEXT.md)
+##
+## Physics Layers (configured in player.tscn):
+##   collision_layer = 1 (PhysicsLayers.PLAYER)
+##   collision_mask = 14 (binary 1110 = MONSTERS | PROJECTILES | ENVIRONMENT)
 
 # Player stats (starting values from lines 70-78)
 @export var level: int = 1

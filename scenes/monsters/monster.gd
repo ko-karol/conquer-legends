@@ -1,7 +1,15 @@
 extends CharacterBody2D
 
-# Monster with AI state machine
-# Based on Pygame implementation (GODOT_MIGRATION_CONTEXT.md lines 109-117)
+## Monster with AI state machine
+## Based on Pygame implementation (GODOT_MIGRATION_CONTEXT.md lines 109-117)
+##
+## Physics Layers (configured in monster.tscn):
+##   Main body:
+##     collision_layer = 2 (PhysicsLayers.MONSTERS)
+##     collision_mask = 13 (binary 1101 = PLAYER | MONSTERS | ENVIRONMENT)
+##   Detection areas (AttackRange/AggroRange):
+##     collision_layer = 0 (detection only, not physical)
+##     collision_mask = 1 (PhysicsLayers.PLAYER)
 
 # Monster stats (from lines 109-117)
 const MONSTER_STATS = {

@@ -203,7 +203,7 @@ func _get_monster_at_position(screen_pos: Vector2) -> Node2D:
 	var world_pos = Isometric.screen_to_world(screen_pos, camera)
 	var iso_pos = Isometric.world_to_iso(world_pos)
 	query.position = iso_pos
-	query.collision_mask = 2  # Monster layer
+	query.collision_mask = PhysicsLayers.MONSTERS
 	
 	var results = space_state.intersect_point(query, 1)
 	

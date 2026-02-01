@@ -1,7 +1,11 @@
 extends Area2D
 
-# Projectile arrow for normal attacks
-# Flies toward target and deals collision-based damage
+## Projectile arrow for normal attacks
+## Flies toward target and deals collision-based damage
+##
+## Physics Layers (configured in arrow.tscn):
+##   collision_layer = 4 (PhysicsLayers.PROJECTILES)
+##   collision_mask = 2 (PhysicsLayers.MONSTERS)
 
 var damage: float = 0.0
 var is_crit: bool = false
