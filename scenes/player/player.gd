@@ -7,46 +7,29 @@ extends CharacterBody2D
 ##   collision_layer = 1 (PhysicsLayers.PLAYER)
 ##   collision_mask = 14 (binary 1110 = MONSTERS | PROJECTILES | ENVIRONMENT)
 
-# Player stats (starting values from lines 70-78)
+# Configuration references
+var player_config: PlayerConfig
+var combat_config: CombatConfig
+
+# Player stats (initialized from config)
 @export var level: int = 1
-var max_hp: float = 500.0
-var hp: float = 500.0
-var max_mp: float = 300.0
-var mp: float = 300.0
+var max_hp: float
+var hp: float
+var max_mp: float
+var mp: float
 var exp: float = 0.0
-var exp_to_next: float = 100.0
+var exp_to_next: float
 
 # Combat component handles attack, defense, damage calculation
 var combat: CombatComponent = null
 
-# Movement constants (lines 95-100)
-const MAX_SPEED: float = 200.0
-const ACCELERATION: float = 1500.0
-const DECELERATION: float = 2000.0
-const DECEL_DISTANCE: float = 150.0
-const STOP_THRESHOLD: float = 5.0
-
-# Jump constants (lines 102-107)
-const JUMP_INITIAL_VZ: float = 350.0
-const GRAVITY: float = 800.0
-const JUMP_MAX_DISTANCE: float = 300.0
-
-# Combat constants
-const ATTACK_RANGE: float = 350.0
-const SCATTER_RANGE: float = 400.0
-const SCATTER_MP_COST: float = 5.0
-const SCATTER_COOLDOWN: float = 0.4
-const AUTO_ATTACK_COOLDOWN: float = 0.8
+# Skill state
 var scatter_level: int = 10
 var scatter_cooldown_timer: float = 0.0
 var auto_attack_timer: float = 0.0
 
 # Target selection (Conquer Online style)
 var selected_target: Node2D = null
-
-# Regen rates
-const HP_REGEN: float = 1.0  # per second
-const MP_REGEN: float = 5.0  # per second
 
 # Note: All resources now loaded via ResourceManager singleton
 
@@ -81,9 +64,21 @@ var queued_action: Dictionary = {}
 @onready var levelup_sound: AudioStreamPlayer = $LevelUpSound
 
 func _ready() -> void:
-	# Initialize combat component
+	# Load configurations
+	player_config = ConfigManager.get_player_config()
+	combat_config = ConfigManager.get_combat_config()
+	
+	# Initialize stats from config
+	level = player_config.starting_level
+	max_hp = player_config.starting_hp
+	hp = max_hp
+	max_mp = player_config.starting_mp
+	mp = max_mp
+	exp_to_next = player_config.starting_exp_to_next
+	
+	# Initialize combat component with config values
 	combat = CombatComponent.new(self)
-	combat.setup(50.0, 20.0, 0.15, 1.5)  # attack, defense, crit_chance, crit_mult
+	combat.setup(player_config.starting_atk, player_config.starting_def, 0.15, 1.5)
 	add_child(combat)
 	
 	# Load sound effects from ResourceManager
@@ -104,8 +99,8 @@ func _physics_process(delta: float) -> void:
 	# Regen HP/MP
 	var old_hp = hp
 	var old_mp = mp
-	hp = min(hp + HP_REGEN * delta, max_hp)
-	mp = min(mp + MP_REGEN * delta, max_mp)
+	hp = min(hp + player_config.hp_regen * delta, max_hp)
+	mp = min(mp + player_config.mp_regen * delta, max_mp)
 	
 	# Emit events if values changed significantly (every 1 HP/MP to avoid spam)
 	if floor(hp) != floor(old_hp):
@@ -139,7 +134,7 @@ func _physics_process(delta: float) -> void:
 func _physics_idle(delta: float) -> void:
 	# Decelerate to stop
 	if current_speed > 0:
-		current_speed = max(0, current_speed - DECELERATION * delta)
+		current_speed = max(0, current_speed - player_config.deceleration * delta)
 		velocity = move_direction * current_speed
 		move_and_slide()
 
@@ -149,7 +144,7 @@ func _physics_moving(delta: float) -> void:
 	var distance = to_target.length()
 	
 	# Check if reached target
-	if distance < STOP_THRESHOLD:
+	if distance < player_config.stop_threshold:
 		current_state = State.IDLE
 		current_speed = 0
 		velocity = Vector2.ZERO
@@ -161,16 +156,16 @@ func _physics_moving(delta: float) -> void:
 	facing_angle = move_direction.angle()
 	
 	# Calculate speed based on distance (decelerate near target)
-	if distance < DECEL_DISTANCE:
+	if distance < player_config.decel_distance:
 		# Ease out
-		var target_speed = (distance / DECEL_DISTANCE) * MAX_SPEED
+		var target_speed = (distance / player_config.decel_distance) * player_config.max_speed
 		if current_speed > target_speed:
-			current_speed = max(target_speed, current_speed - DECELERATION * delta)
+			current_speed = max(target_speed, current_speed - player_config.deceleration * delta)
 		else:
-			current_speed = min(target_speed, current_speed + ACCELERATION * delta)
+			current_speed = min(target_speed, current_speed + player_config.acceleration * delta)
 	else:
 		# Accelerate to max speed
-		current_speed = min(MAX_SPEED, current_speed + ACCELERATION * delta)
+		current_speed = min(player_config.max_speed, current_speed + player_config.acceleration * delta)
 	
 	# Apply movement
 	velocity = move_direction * current_speed
@@ -178,7 +173,7 @@ func _physics_moving(delta: float) -> void:
 
 func _physics_jumping(delta: float) -> void:
 	# Update jump physics (vertical)
-	jump_vz -= GRAVITY * delta
+	jump_vz -= player_config.gravity * delta
 	jump_z += jump_vz * delta
 	
 	# Horizontal movement
@@ -224,18 +219,18 @@ func jump_to(world_target: Vector2) -> void:
 	var jump_distance = position.distance_to(iso_target)
 	
 	# Limit jump distance
-	if jump_distance > JUMP_MAX_DISTANCE:
+	if jump_distance > player_config.jump_max_distance:
 		var direction = (iso_target - position).normalized()
-		iso_target = position + direction * JUMP_MAX_DISTANCE
+		iso_target = position + direction * player_config.jump_max_distance
 	
 	# Calculate jump parameters
 	jump_start_pos = position
 	jump_target_pos = iso_target
-	jump_vz = JUMP_INITIAL_VZ
+	jump_vz = player_config.jump_initial_vz
 	jump_z = 0
 	
 	# Calculate horizontal velocity to reach target during jump arc
-	var jump_time = 2.0 * JUMP_INITIAL_VZ / GRAVITY  # Time to peak and back
+	var jump_time = 2.0 * player_config.jump_initial_vz / player_config.gravity
 	jump_horizontal_velocity = (jump_target_pos - jump_start_pos) / jump_time
 	
 	is_jumping = true
@@ -329,7 +324,7 @@ func normal_attack(target_monster: Node2D) -> void:
 	
 	# Check range
 	var distance = position.distance_to(target_monster.position)
-	if distance > ATTACK_RANGE:
+	if distance > combat_config.attack_range:
 		print("Target out of range")
 		return
 	
@@ -371,13 +366,13 @@ func scatter_skill(world_target: Vector2) -> void:
 		return
 	
 	# Check MP
-	if mp < SCATTER_MP_COST:
+	if mp < combat_config.scatter_mp_cost:
 		print("Not enough MP")
 		return
 	
 	# Consume MP and start cooldown
-	mp -= SCATTER_MP_COST
-	scatter_cooldown_timer = SCATTER_COOLDOWN
+	mp -= combat_config.scatter_mp_cost
+	scatter_cooldown_timer = combat_config.scatter_cooldown
 	
 	# Emit MP change and cooldown events
 	EventBus.player_mp_changed.emit(mp, max_mp)
@@ -414,7 +409,7 @@ func scatter_skill(world_target: Vector2) -> void:
 		var distance = to_monster.length()
 		
 		# Check range
-		if distance > SCATTER_RANGE:
+		if distance > combat_config.scatter_range:
 			continue
 		
 		# Check if within fan angle
@@ -508,13 +503,13 @@ func _process_auto_attack(delta: float) -> void:
 	
 	# Check range
 	var distance = position.distance_to(selected_target.position)
-	if distance > ATTACK_RANGE:
+	if distance > combat_config.attack_range:
 		# Target too far, could optionally move closer here
 		return
 	
 	# Auto-attack!
 	_execute_attack(selected_target)
-	auto_attack_timer = AUTO_ATTACK_COOLDOWN
+	auto_attack_timer = combat_config.auto_attack_cooldown
 
 func _execute_attack(target_monster: Node2D) -> void:
 	"""Execute attack on target (shared by manual and auto-attack)"""

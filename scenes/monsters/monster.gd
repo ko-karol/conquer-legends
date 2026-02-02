@@ -11,83 +11,9 @@ extends CharacterBody2D
 ##     collision_layer = 0 (detection only, not physical)
 ##     collision_mask = 1 (PhysicsLayers.PLAYER)
 
-# Monster stats (from lines 109-117)
-const MONSTER_STATS = {
-	GameManager.MonsterType.PHEASANT: {
-		"name": "Pheasant",
-		"base_hp": 30.0,
-		"base_atk": 5.0,
-		"base_exp": 8.0,
-		"color": Color(0.6, 0.4, 0.2),  # Brown
-		"size": 18.0,
-		"speed": 40.0
-	},
-	GameManager.MonsterType.TURTLEDOVE: {
-		"name": "Turtledove",
-		"base_hp": 50.0,
-		"base_atk": 10.0,
-		"base_exp": 15.0,
-		"color": Color(0.5, 0.5, 0.5),  # Gray
-		"size": 20.0,
-		"speed": 50.0
-	},
-	GameManager.MonsterType.ROBIN: {
-		"name": "Robin",
-		"base_hp": 80.0,
-		"base_atk": 18.0,
-		"base_exp": 25.0,
-		"color": Color(1.0, 0.5, 0.2),  # Orange
-		"size": 22.0,
-		"speed": 60.0
-	},
-	GameManager.MonsterType.BANDIT: {
-		"name": "Bandit",
-		"base_hp": 120.0,
-		"base_atk": 28.0,
-		"base_exp": 40.0,
-		"color": Color(0.5, 0.1, 0.1),  # Dark red
-		"size": 28.0,
-		"speed": 70.0
-	},
-	GameManager.MonsterType.BANDIT_L: {
-		"name": "BanditL",
-		"base_hp": 200.0,
-		"base_atk": 45.0,
-		"base_exp": 80.0,
-		"color": Color(0.5, 0.2, 0.6),  # Purple
-		"size": 32.0,
-		"speed": 80.0
-	},
-	GameManager.MonsterType.APE: {
-		"name": "Ape",
-		"base_hp": 350.0,
-		"base_atk": 65.0,
-		"base_exp": 150.0,
-		"color": Color(0.3, 0.2, 0.1),  # Dark brown
-		"size": 38.0,
-		"speed": 90.0
-	},
-	GameManager.MonsterType.APE_KING: {
-		"name": "ApeKing",
-		"base_hp": 800.0,
-		"base_atk": 120.0,
-		"base_exp": 500.0,
-		"color": Color(0.8, 0.1, 0.1),  # Red
-		"size": 50.0,
-		"speed": 60.0
-	}
-}
-
-# AI constants (from context)
-const AGGRO_RANGE = 150.0
-const ATTACK_RANGE = 40.0
-const RETURN_DISTANCE = 300.0  # Distance from spawn before returning
-const WANDER_RADIUS = 100.0
-const WANDER_WAIT_MIN = 1.0
-const WANDER_WAIT_MAX = 3.0
-
-# Level scaling (1.12x per level)
-const LEVEL_MULTIPLIER = 1.12
+# Configuration references
+var combat_config: CombatConfig
+var monster_stats: MonsterStats  # Stats for this specific monster type
 
 # Note: All resources now loaded via ResourceManager singleton
 
@@ -132,25 +58,24 @@ var is_selected: bool = false
 @onready var death_sound: AudioStreamPlayer = $DeathSound
 
 func _ready() -> void:
-	# Will be initialized when spawned
-	pass
+	# Get config references
+	combat_config = ConfigManager.get_combat_config()
 
 func initialize(type: int, spawn_level: int, world_spawn_pos: Vector2) -> void:
 	monster_type = type
 	level = spawn_level
+	 
+	# Get base stats from config
+	var stats = ConfigManager.get_monster_stats(type)
 	
-	# Get base stats
-	var stats = MONSTER_STATS[type]
-	
-	# Apply level scaling (1.12x per level)
-	var scale_factor = pow(LEVEL_MULTIPLIER, level - 1)
-	max_hp = stats["base_hp"] * scale_factor
+	# Apply level scaling
+	max_hp = stats.get_hp_at_level(level)
 	hp = max_hp
-	var attack_value = stats["base_atk"] * scale_factor
-	exp_reward = stats["base_exp"] * scale_factor
-	move_speed = stats["speed"]
-	size = stats["size"]
-	color = stats["color"]
+	var attack_value = stats.get_atk_at_level(level)
+	exp_reward = stats.get_exp_at_level(level)
+	move_speed = stats.speed
+	size = stats.size
+	color = stats.color
 	
 	# Initialize combat component for monsters
 	combat = CombatComponent.new(self)
@@ -203,8 +128,8 @@ func _setup_visuals() -> void:
 	shadow_shape.polygon = shadow_points
 	
 	# Setup name label
-	var stats = MONSTER_STATS[monster_type]
-	name_label.text = stats["name"]
+	var stats = ConfigManager.get_monster_stats(monster_type)
+	name_label.text = stats.monster_name
 	
 	# Position UI elements above monster
 	var ui_y_offset = -size - 20
@@ -222,13 +147,13 @@ func _setup_collision() -> void:
 	# Aggro range
 	var aggro_collision = $AggroRange/AggroCollision
 	var aggro_circle = CircleShape2D.new()
-	aggro_circle.radius = AGGRO_RANGE
+	aggro_circle.radius = combat_config.aggro_range
 	aggro_collision.shape = aggro_circle
 	
 	# Attack range
 	var attack_collision = $AttackRange/AttackCollision
 	var attack_circle = CircleShape2D.new()
-	attack_circle.radius = ATTACK_RANGE
+	attack_circle.radius = combat_config.monster_attack_range
 	attack_collision.shape = attack_circle
 	
 	# Connect signals
@@ -270,11 +195,11 @@ func _update_wander(delta: float) -> void:
 func _start_wander() -> void:
 	# Pick random position near spawn
 	var random_offset = Vector2(
-		randf_range(-WANDER_RADIUS, WANDER_RADIUS),
-		randf_range(-WANDER_RADIUS, WANDER_RADIUS)
+		randf_range(-combat_config.wander_radius, combat_config.wander_radius),
+		randf_range(-combat_config.wander_radius, combat_config.wander_radius)
 	)
 	target_position = spawn_position + random_offset
-	wander_timer = randf_range(WANDER_WAIT_MIN, WANDER_WAIT_MAX)
+	wander_timer = randf_range(combat_config.wander_wait_min, combat_config.wander_wait_max)
 
 func _update_chase(_delta: float) -> void:
 	if not is_instance_valid(target_player):
@@ -282,12 +207,12 @@ func _update_chase(_delta: float) -> void:
 		return
 	
 	# Check if too far from spawn
-	if position.distance_to(spawn_position) > RETURN_DISTANCE:
+	if position.distance_to(spawn_position) > combat_config.return_distance:
 		current_state = State.RETURN
 		return
 	
 	# Check if in attack range
-	if position.distance_to(target_player.position) <= ATTACK_RANGE:
+	if position.distance_to(target_player.position) <= combat_config.monster_attack_range:
 		current_state = State.ATTACK
 		return
 	
@@ -303,7 +228,7 @@ func _update_attack(_delta: float) -> void:
 	
 	# Check if player out of attack range
 	var dist_to_player = position.distance_to(target_player.position)
-	if dist_to_player > ATTACK_RANGE:
+	if dist_to_player > combat_config.monster_attack_range:
 		current_state = State.CHASE
 		return
 	
@@ -417,7 +342,8 @@ func _die() -> void:
 		var player = players[0]
 		if player.has_method("gain_exp"):
 			player.gain_exp(exp_reward)
-			print("%s killed! Player gained %.0f EXP" % [MONSTER_STATS[monster_type]["name"], exp_reward])
+			var stats = ConfigManager.get_monster_stats(monster_type)
+			print("%s killed! Player gained %.0f EXP" % [stats.monster_name, exp_reward])
 	
 	# Emit death event
 	EventBus.emit_death(self, null)

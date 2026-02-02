@@ -19,12 +19,6 @@ signal damage_taken(damage: float, target: Node, source: Node, is_crit: bool)
 ## killer: Node - Entity that caused death (can be null)
 signal entity_died(victim: Node, killer: Node)
 
-## Emitted when player attacks
-## target: Node - Attack target
-## damage: float - Damage amount
-## is_crit: bool - Whether attack was critical
-signal player_attacked(target: Node, damage: float, is_crit: bool)
-
 ## Emitted when player uses scatter skill
 ## num_targets: int - Number of targets hit
 ## total_damage: float - Total damage dealt
@@ -38,10 +32,6 @@ signal monster_attacked(monster: Node, damage: float)
 # ============================================================
 # PLAYER EVENTS
 # ============================================================
-
-## Emitted when player stats change (HP, MP, etc.)
-## player: Node - Player reference
-signal player_stats_changed(player: Node)
 
 ## Emitted when player levels up
 ## new_level: int - Player's new level
@@ -79,12 +69,6 @@ signal monster_spawned(monster: Node, monster_type: int, level: int)
 ## monster: Node - Monster being removed
 signal monster_despawned(monster: Node)
 
-## Emitted when monster changes AI state
-## monster: Node - Monster reference
-## old_state: int - Previous state enum value
-## new_state: int - New state enum value
-signal monster_state_changed(monster: Node, old_state: int, new_state: int)
-
 # ============================================================
 # VISUAL EFFECTS EVENTS
 # ============================================================
@@ -108,9 +92,6 @@ signal damage_number_requested(damage: float, position: Vector2, is_crit: bool)
 # UI EVENTS
 # ============================================================
 
-## Emitted when UI needs to refresh player display
-signal ui_refresh_requested()
-
 ## Emitted when skill cooldown changes
 ## skill_name: String - Name of skill
 ## cooldown_remaining: float - Time remaining on cooldown
@@ -119,10 +100,6 @@ signal skill_cooldown_changed(skill_name: String, cooldown_remaining: float)
 # ============================================================
 # SYSTEM EVENTS
 # ============================================================
-
-## Emitted when game is paused/unpaused
-## is_paused: bool - New pause state
-signal game_paused(is_paused: bool)
 
 ## Emitted when debug mode toggles
 ## debug_enabled: bool - New debug state

@@ -37,7 +37,6 @@ func _ready() -> void:
 	# Connect to event bus signals
 	EventBus.player_hp_changed.connect(_on_player_hp_changed)
 	EventBus.player_mp_changed.connect(_on_player_mp_changed)
-	EventBus.player_stats_changed.connect(_on_player_stats_changed)
 	EventBus.player_leveled_up.connect(_on_player_leveled_up)
 	EventBus.player_gained_exp.connect(_on_player_exp_gained)
 	EventBus.skill_cooldown_changed.connect(_on_skill_cooldown_changed)
@@ -73,7 +72,7 @@ func _update_player_stats() -> void:
 	level_label.text = "Level: %d" % player.level
 	attack_label.text = "ATK: %.0f" % player.combat.get_attack()
 	defense_label.text = "DEF: %.0f" % player.combat.get_defense()
-	speed_label.text = "Speed: %.0f" % player.MAX_SPEED
+	speed_label.text = "Speed: %.0f" % ConfigManager.get_player_config().max_speed
 	
 	# Skill info
 	scatter_label.text = "Scatter Lv: %d" % player.scatter_level
