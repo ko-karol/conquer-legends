@@ -2,27 +2,39 @@ extends CanvasLayer
 
 # HUD overlay with HP/MP/EXP bars, stats, and controls
 
-# References to UI elements
-@onready var hp_bar: ProgressBar = $MarginContainer/Panel/InnerMargin/VBoxContainer/HPBar/ProgressBar
-@onready var hp_label: Label = $MarginContainer/Panel/InnerMargin/VBoxContainer/HPBar/ValueLabel
-@onready var mp_bar: ProgressBar = $MarginContainer/Panel/InnerMargin/VBoxContainer/MPBar/ProgressBar
-@onready var mp_label: Label = $MarginContainer/Panel/InnerMargin/VBoxContainer/MPBar/ValueLabel
-@onready var exp_bar: ProgressBar = $MarginContainer/Panel/InnerMargin/VBoxContainer/EXPBar/ProgressBar
-@onready var exp_label: Label = $MarginContainer/Panel/InnerMargin/VBoxContainer/EXPBar/ValueLabel
+# References to UI elements - using hybrid approach for robustness
+@onready var hud_panel: PanelContainer = $MarginContainer/HUDPanel
+@onready var toggle_button: Button = $ToggleButtonContainer/ToggleButton
 
-@onready var level_label: Label = $MarginContainer/Panel/InnerMargin/VBoxContainer/StatsContainer/LevelLabel
-@onready var attack_label: Label = $MarginContainer/Panel/InnerMargin/VBoxContainer/StatsContainer/AttackLabel
-@onready var defense_label: Label = $MarginContainer/Panel/InnerMargin/VBoxContainer/StatsContainer/DefenseLabel
-@onready var speed_label: Label = $MarginContainer/Panel/InnerMargin/VBoxContainer/StatsContainer/SpeedLabel
+# Bars accessed via direct paths (short enough)
+@onready var hp_bar: ProgressBar = hud_panel.get_node("InnerMargin/VBoxContainer/HPBar/HPProgressBar")
+@onready var hp_label: Label = hp_bar.get_node("HPValue")
+@onready var mp_bar: ProgressBar = hud_panel.get_node("InnerMargin/VBoxContainer/MPBar/MPProgressBar")
+@onready var mp_label: Label = mp_bar.get_node("MPValue")
 
-@onready var scatter_label: Label = $MarginContainer/Panel/InnerMargin/VBoxContainer/SkillInfo/ScatterLabel
-@onready var cooldown_label: Label = $MarginContainer/Panel/InnerMargin/VBoxContainer/SkillInfo/CooldownLabel
+# Stats labels - navigate from container
+@onready var stats_container: VBoxContainer = hud_panel.get_node("InnerMargin/VBoxContainer/StatsContainer")
+@onready var level_label: Label = stats_container.get_node("LevelLabel")
+@onready var attack_label: Label = stats_container.get_node("AttackLabel")
+@onready var defense_label: Label = stats_container.get_node("DefenseLabel")
+@onready var speed_label: Label = stats_container.get_node("SpeedLabel")
 
-@onready var fps_label: Label = $MarginContainer/Panel/InnerMargin/VBoxContainer/FPSLabel
+# Skill info - navigate from container
+@onready var skill_container: VBoxContainer = hud_panel.get_node("InnerMargin/VBoxContainer/SkillInfo")
+@onready var scatter_label: Label = skill_container.get_node("ScatterLabel")
+@onready var cooldown_label: Label = skill_container.get_node("CooldownLabel")
+
+# FPS label
+@onready var fps_label: Label = hud_panel.get_node("InnerMargin/VBoxContainer/FPSLabel")
 
 var player: CharacterBody2D = null
+var is_hud_visible: bool = true
 
 func _ready() -> void:
+	# Connect toggle button
+	toggle_button.pressed.connect(_on_toggle_button_pressed)
+	_update_toggle_button_text()
+	
 	# Find player in scene
 	await get_tree().process_frame
 	player = get_tree().get_first_node_in_group("player")
@@ -38,7 +50,6 @@ func _ready() -> void:
 	EventBus.player_hp_changed.connect(_on_player_hp_changed)
 	EventBus.player_mp_changed.connect(_on_player_mp_changed)
 	EventBus.player_leveled_up.connect(_on_player_leveled_up)
-	EventBus.player_gained_exp.connect(_on_player_exp_gained)
 	EventBus.skill_cooldown_changed.connect(_on_skill_cooldown_changed)
 
 func _process(_delta: float) -> void:
@@ -62,11 +73,6 @@ func _update_player_stats() -> void:
 	mp_bar.max_value = player.max_mp
 	mp_bar.value = player.mp
 	mp_label.text = "%d/%d" % [player.mp, player.max_mp]
-	
-	# EXP bar
-	exp_bar.max_value = player.exp_to_next
-	exp_bar.value = player.exp
-	exp_label.text = "%d/%d" % [player.exp, player.exp_to_next]
 	
 	# Stats
 	level_label.text = "Level: %d" % player.level
@@ -103,15 +109,17 @@ func _on_player_leveled_up(new_level: int) -> void:
 	level_label.text = "Level: %d" % new_level
 	_update_player_stats()
 
-func _on_player_exp_gained(_exp_amount: float) -> void:
-	if player:
-		exp_bar.max_value = player.exp_to_next
-		exp_bar.value = player.exp
-		exp_label.text = "%d/%d" % [player.exp, player.exp_to_next]
-
 func _on_skill_cooldown_changed(skill_name: String, cooldown_remaining: float) -> void:
 	if skill_name == "scatter":
 		if cooldown_remaining > 0:
 			cooldown_label.text = "Cooldown: %.1fs" % cooldown_remaining
 		else:
 			cooldown_label.text = "Cooldown: Ready"
+
+func _on_toggle_button_pressed() -> void:
+	is_hud_visible = !is_hud_visible
+	hud_panel.visible = is_hud_visible
+	_update_toggle_button_text()
+
+func _update_toggle_button_text() -> void:
+	toggle_button.text = "Close HUD" if is_hud_visible else "Open HUD"

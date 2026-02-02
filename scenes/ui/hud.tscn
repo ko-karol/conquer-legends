@@ -1,7 +1,19 @@
-[gd_scene load_steps=15 format=3 uid="uid://c7vp7yxqgqxo3"]
+[gd_scene format=3 uid="uid://c7vp7yxqgqxo3"]
 
-[ext_resource type="Script" path="res://scenes/ui/hud.gd" id="1_hud"]
-[ext_resource type="PackedScene" uid="uid://bwp7yxqgqxo4" path="res://scenes/ui/minimap.tscn" id="2_minimap"]
+[ext_resource type="Script" uid="uid://ckja28smi3uws" path="res://scenes/ui/hud.gd" id="1_hud"]
+[ext_resource type="PackedScene" path="res://scenes/ui/minimap.tscn" id="2_minimap"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
+bg_color = Color(0.1, 0.1, 0.1, 0.7)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.3, 0.4, 0.3, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_hp_bg"]
 bg_color = Color(0.1, 0.1, 0.1, 0.8)
@@ -19,6 +31,12 @@ border_width_right = 1
 border_width_bottom = 1
 border_color = Color(1, 0.3, 0.3, 1)
 
+[sub_resource type="LabelSettings" id="LabelSettings_normal"]
+font_size = 12
+font_color = Color(0.85, 0.85, 0.85, 1)
+outline_size = 1
+outline_color = Color(0, 0, 0, 1)
+
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_mp_bg"]
 bg_color = Color(0.1, 0.1, 0.1, 0.8)
 border_width_left = 2
@@ -35,49 +53,15 @@ border_width_right = 1
 border_width_bottom = 1
 border_color = Color(0.3, 0.6, 1, 1)
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_exp_bg"]
-bg_color = Color(0.1, 0.1, 0.1, 0.8)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.3, 0.3, 0.3, 1)
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_exp_fill"]
-bg_color = Color(0.8, 0.7, 0.2, 1)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(1, 0.9, 0.3, 1)
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
-bg_color = Color(0.1, 0.1, 0.1, 0.7)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.3, 0.4, 0.3, 1)
-corner_radius_top_left = 4
-corner_radius_top_right = 4
-corner_radius_bottom_right = 4
-corner_radius_bottom_left = 4
-
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_separator"]
-bg_color = Color(0.3, 0.4, 0.3, 1)
 content_margin_top = 1.0
 content_margin_bottom = 1.0
+bg_color = Color(0.3, 0.4, 0.3, 1)
 
 [sub_resource type="LabelSettings" id="LabelSettings_title"]
 font_size = 14
 font_color = Color(0.9, 0.9, 0.9, 1)
 outline_size = 2
-outline_color = Color(0, 0, 0, 1)
-
-[sub_resource type="LabelSettings" id="LabelSettings_normal"]
-font_size = 12
-font_color = Color(0.85, 0.85, 0.85, 1)
-outline_size = 1
 outline_color = Color(0, 0, 0, 1)
 
 [sub_resource type="LabelSettings" id="LabelSettings_small"]
@@ -86,10 +70,10 @@ font_color = Color(0.75, 0.75, 0.75, 1)
 outline_size = 1
 outline_color = Color(0, 0, 0, 1)
 
-[node name="HUD" type="CanvasLayer"]
+[node name="HUD" type="CanvasLayer" unique_id=1705085249]
 script = ExtResource("1_hud")
 
-[node name="MarginContainer" type="MarginContainer" parent="."]
+[node name="MarginContainer" type="MarginContainer" parent="." unique_id=730889395]
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -100,36 +84,30 @@ theme_override_constants/margin_top = 20
 theme_override_constants/margin_right = 20
 theme_override_constants/margin_bottom = 20
 
-[node name="Panel" type="PanelContainer" parent="MarginContainer"]
+[node name="HUDPanel" type="PanelContainer" parent="MarginContainer" unique_name_in_owner=true unique_id=847799707]
 layout_mode = 2
 size_flags_horizontal = 0
 size_flags_vertical = 0
 theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
 
-[node name="InnerMargin" type="MarginContainer" parent="MarginContainer/Panel"]
+[node name="InnerMargin" type="MarginContainer" parent="MarginContainer/HUDPanel" unique_id=909009234]
 layout_mode = 2
 theme_override_constants/margin_left = 10
 theme_override_constants/margin_top = 10
 theme_override_constants/margin_right = 10
 theme_override_constants/margin_bottom = 10
 
-[node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer/Panel/InnerMargin"]
+[node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer/HUDPanel/InnerMargin" unique_id=1089415830]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="HPBar" type="HBoxContainer" parent="MarginContainer/Panel/InnerMargin/VBoxContainer"]
+[node name="HPBar" type="HBoxContainer" parent="MarginContainer/HUDPanel/InnerMargin/VBoxContainer" unique_id=672046662]
 layout_mode = 2
+size_flags_horizontal = 0
 theme_override_constants/separation = 8
 
-[node name="Label" type="Label" parent="MarginContainer/Panel/InnerMargin/VBoxContainer/HPBar"]
-custom_minimum_size = Vector2(40, 0)
-layout_mode = 2
-text = "HP:"
-label_settings = SubResource("LabelSettings_normal")
-horizontal_alignment = 2
-
-[node name="ProgressBar" type="ProgressBar" parent="MarginContainer/Panel/InnerMargin/VBoxContainer/HPBar"]
-custom_minimum_size = Vector2(200, 24)
+[node name="HPProgressBar" type="ProgressBar" parent="MarginContainer/HUDPanel/InnerMargin/VBoxContainer/HPBar" unique_id=1441515491 unique_name_in_owner="true"]
+custom_minimum_size = Vector2(300, 0)
 layout_mode = 2
 theme_override_styles/background = SubResource("StyleBoxFlat_hp_bg")
 theme_override_styles/fill = SubResource("StyleBoxFlat_hp_fill")
@@ -137,25 +115,30 @@ max_value = 500.0
 value = 500.0
 show_percentage = false
 
-[node name="ValueLabel" type="Label" parent="MarginContainer/Panel/InnerMargin/VBoxContainer/HPBar"]
-custom_minimum_size = Vector2(70, 0)
-layout_mode = 2
+[node name="HPValue" type="Label" parent="MarginContainer/HUDPanel/InnerMargin/VBoxContainer/HPBar/HPProgressBar" unique_id=1847477177 unique_name_in_owner="true"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -23.0
+offset_top = -12.0
+offset_right = 23.0
+offset_bottom = 5.0
+grow_horizontal = 2
+grow_vertical = 2
 text = "500/500"
 label_settings = SubResource("LabelSettings_normal")
+horizontal_alignment = 1
 
-[node name="MPBar" type="HBoxContainer" parent="MarginContainer/Panel/InnerMargin/VBoxContainer"]
+[node name="MPBar" type="HBoxContainer" parent="MarginContainer/HUDPanel/InnerMargin/VBoxContainer" unique_id=2008815095]
 layout_mode = 2
+size_flags_horizontal = 8
 theme_override_constants/separation = 8
 
-[node name="Label" type="Label" parent="MarginContainer/Panel/InnerMargin/VBoxContainer/MPBar"]
-custom_minimum_size = Vector2(40, 0)
-layout_mode = 2
-text = "MP:"
-label_settings = SubResource("LabelSettings_normal")
-horizontal_alignment = 2
-
-[node name="ProgressBar" type="ProgressBar" parent="MarginContainer/Panel/InnerMargin/VBoxContainer/MPBar"]
-custom_minimum_size = Vector2(200, 24)
+[node name="MPProgressBar" type="ProgressBar" parent="MarginContainer/HUDPanel/InnerMargin/VBoxContainer/MPBar" unique_id=889365524 unique_name_in_owner="true"]
+custom_minimum_size = Vector2(300, 0)
 layout_mode = 2
 theme_override_styles/background = SubResource("StyleBoxFlat_mp_bg")
 theme_override_styles/fill = SubResource("StyleBoxFlat_mp_fill")
@@ -163,128 +146,133 @@ max_value = 300.0
 value = 300.0
 show_percentage = false
 
-[node name="ValueLabel" type="Label" parent="MarginContainer/Panel/InnerMargin/VBoxContainer/MPBar"]
-custom_minimum_size = Vector2(70, 0)
-layout_mode = 2
+[node name="MPValue" type="Label" parent="MarginContainer/HUDPanel/InnerMargin/VBoxContainer/MPBar/MPProgressBar" unique_id=690161482 unique_name_in_owner="true"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -35.0
+offset_top = -12.0
+offset_right = 35.0
+offset_bottom = 5.0
+grow_horizontal = 2
+grow_vertical = 2
 text = "300/300"
 label_settings = SubResource("LabelSettings_normal")
+horizontal_alignment = 1
+vertical_alignment = 1
 
-[node name="EXPBar" type="HBoxContainer" parent="MarginContainer/Panel/InnerMargin/VBoxContainer"]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="Label" type="Label" parent="MarginContainer/Panel/InnerMargin/VBoxContainer/EXPBar"]
-custom_minimum_size = Vector2(40, 0)
-layout_mode = 2
-text = "EXP:"
-label_settings = SubResource("LabelSettings_normal")
-horizontal_alignment = 2
-
-[node name="ProgressBar" type="ProgressBar" parent="MarginContainer/Panel/InnerMargin/VBoxContainer/EXPBar"]
-custom_minimum_size = Vector2(200, 24)
-layout_mode = 2
-theme_override_styles/background = SubResource("StyleBoxFlat_exp_bg")
-theme_override_styles/fill = SubResource("StyleBoxFlat_exp_fill")
-max_value = 100.0
-show_percentage = false
-
-[node name="ValueLabel" type="Label" parent="MarginContainer/Panel/InnerMargin/VBoxContainer/EXPBar"]
-custom_minimum_size = Vector2(70, 0)
-layout_mode = 2
-text = "0/100"
-label_settings = SubResource("LabelSettings_normal")
-
-[node name="HSeparator" type="HSeparator" parent="MarginContainer/Panel/InnerMargin/VBoxContainer"]
+[node name="HSeparator" type="HSeparator" parent="MarginContainer/HUDPanel/InnerMargin/VBoxContainer" unique_id=1913331729]
 layout_mode = 2
 theme_override_styles/separator = SubResource("StyleBoxFlat_separator")
 
-[node name="StatsContainer" type="VBoxContainer" parent="MarginContainer/Panel/InnerMargin/VBoxContainer"]
+[node name="StatsContainer" type="VBoxContainer" parent="MarginContainer/HUDPanel/InnerMargin/VBoxContainer" unique_id=206396203]
 layout_mode = 2
 theme_override_constants/separation = 4
 
-[node name="LevelLabel" type="Label" parent="MarginContainer/Panel/InnerMargin/VBoxContainer/StatsContainer"]
+[node name="LevelLabel" type="Label" parent="MarginContainer/HUDPanel/InnerMargin/VBoxContainer/StatsContainer" unique_id=1089852894 unique_name_in_owner="true"]
 layout_mode = 2
 text = "Level: 1"
 label_settings = SubResource("LabelSettings_title")
 
-[node name="AttackLabel" type="Label" parent="MarginContainer/Panel/InnerMargin/VBoxContainer/StatsContainer"]
+[node name="AttackLabel" type="Label" parent="MarginContainer/HUDPanel/InnerMargin/VBoxContainer/StatsContainer" unique_id=915281904 unique_name_in_owner="true"]
 layout_mode = 2
 text = "ATK: 50"
 label_settings = SubResource("LabelSettings_normal")
 
-[node name="DefenseLabel" type="Label" parent="MarginContainer/Panel/InnerMargin/VBoxContainer/StatsContainer"]
+[node name="DefenseLabel" type="Label" parent="MarginContainer/HUDPanel/InnerMargin/VBoxContainer/StatsContainer" unique_id=1350905295 unique_name_in_owner="true"]
 layout_mode = 2
 text = "DEF: 20"
 label_settings = SubResource("LabelSettings_normal")
 
-[node name="SpeedLabel" type="Label" parent="MarginContainer/Panel/InnerMargin/VBoxContainer/StatsContainer"]
+[node name="SpeedLabel" type="Label" parent="MarginContainer/HUDPanel/InnerMargin/VBoxContainer/StatsContainer" unique_id=1497614339 unique_name_in_owner="true"]
 layout_mode = 2
 text = "Speed: 200"
 label_settings = SubResource("LabelSettings_normal")
 
-[node name="HSeparator2" type="HSeparator" parent="MarginContainer/Panel/InnerMargin/VBoxContainer"]
+[node name="HSeparator2" type="HSeparator" parent="MarginContainer/HUDPanel/InnerMargin/VBoxContainer" unique_id=1793890474]
 layout_mode = 2
 theme_override_styles/separator = SubResource("StyleBoxFlat_separator")
 
-[node name="SkillInfo" type="VBoxContainer" parent="MarginContainer/Panel/InnerMargin/VBoxContainer"]
+[node name="SkillInfo" type="VBoxContainer" parent="MarginContainer/HUDPanel/InnerMargin/VBoxContainer" unique_id=310521851]
 layout_mode = 2
 theme_override_constants/separation = 4
 
-[node name="ScatterLabel" type="Label" parent="MarginContainer/Panel/InnerMargin/VBoxContainer/SkillInfo"]
+[node name="ScatterLabel" type="Label" parent="MarginContainer/HUDPanel/InnerMargin/VBoxContainer/SkillInfo" unique_id=1729019534 unique_name_in_owner="true"]
 layout_mode = 2
 text = "Scatter Lv: 0"
 label_settings = SubResource("LabelSettings_normal")
 
-[node name="CooldownLabel" type="Label" parent="MarginContainer/Panel/InnerMargin/VBoxContainer/SkillInfo"]
+[node name="CooldownLabel" type="Label" parent="MarginContainer/HUDPanel/InnerMargin/VBoxContainer/SkillInfo" unique_id=1764453850 unique_name_in_owner="true"]
 layout_mode = 2
 text = "Cooldown: Ready"
 label_settings = SubResource("LabelSettings_normal")
 
-[node name="HSeparator3" type="HSeparator" parent="MarginContainer/Panel/InnerMargin/VBoxContainer"]
+[node name="HSeparator3" type="HSeparator" parent="MarginContainer/HUDPanel/InnerMargin/VBoxContainer" unique_id=1282982918]
 layout_mode = 2
 theme_override_styles/separator = SubResource("StyleBoxFlat_separator")
 
-[node name="FPSLabel" type="Label" parent="MarginContainer/Panel/InnerMargin/VBoxContainer"]
+[node name="FPSLabel" type="Label" parent="MarginContainer/HUDPanel/InnerMargin/VBoxContainer" unique_id=1795353288 unique_name_in_owner="true"]
 layout_mode = 2
 text = "FPS: 60"
 label_settings = SubResource("LabelSettings_small")
 
-[node name="HSeparator4" type="HSeparator" parent="MarginContainer/Panel/InnerMargin/VBoxContainer"]
+[node name="HSeparator4" type="HSeparator" parent="MarginContainer/HUDPanel/InnerMargin/VBoxContainer" unique_id=309384374]
 layout_mode = 2
 theme_override_styles/separator = SubResource("StyleBoxFlat_separator")
 
-[node name="ControlsHelp" type="VBoxContainer" parent="MarginContainer/Panel/InnerMargin/VBoxContainer"]
+[node name="ControlsHelp" type="VBoxContainer" parent="MarginContainer/HUDPanel/InnerMargin/VBoxContainer" unique_id=1630037042]
 layout_mode = 2
 theme_override_constants/separation = 2
 
-[node name="Title" type="Label" parent="MarginContainer/Panel/InnerMargin/VBoxContainer/ControlsHelp"]
+[node name="Title" type="Label" parent="MarginContainer/HUDPanel/InnerMargin/VBoxContainer/ControlsHelp" unique_id=1754996136]
 layout_mode = 2
 text = "Controls:"
 label_settings = SubResource("LabelSettings_normal")
 
-[node name="Move" type="Label" parent="MarginContainer/Panel/InnerMargin/VBoxContainer/ControlsHelp"]
+[node name="Move" type="Label" parent="MarginContainer/HUDPanel/InnerMargin/VBoxContainer/ControlsHelp" unique_id=657676143]
 layout_mode = 2
 text = "LMB - Move"
 label_settings = SubResource("LabelSettings_small")
 
-[node name="Jump" type="Label" parent="MarginContainer/Panel/InnerMargin/VBoxContainer/ControlsHelp"]
+[node name="Jump" type="Label" parent="MarginContainer/HUDPanel/InnerMargin/VBoxContainer/ControlsHelp" unique_id=169997361]
 layout_mode = 2
 text = "Ctrl+LMB - Jump"
 label_settings = SubResource("LabelSettings_small")
 
-[node name="Scatter" type="Label" parent="MarginContainer/Panel/InnerMargin/VBoxContainer/ControlsHelp"]
+[node name="Scatter" type="Label" parent="MarginContainer/HUDPanel/InnerMargin/VBoxContainer/ControlsHelp" unique_id=1324561251]
 layout_mode = 2
 text = "RMB - Scatter"
 label_settings = SubResource("LabelSettings_small")
 
-[node name="Zoom" type="Label" parent="MarginContainer/Panel/InnerMargin/VBoxContainer/ControlsHelp"]
+[node name="Zoom" type="Label" parent="MarginContainer/HUDPanel/InnerMargin/VBoxContainer/ControlsHelp" unique_id=1343160534]
 layout_mode = 2
 text = "Scroll/+/- - Zoom"
 label_settings = SubResource("LabelSettings_small")
 
-[node name="ZoomReset" type="Label" parent="MarginContainer/Panel/InnerMargin/VBoxContainer/ControlsHelp"]
+[node name="ZoomReset" type="Label" parent="MarginContainer/HUDPanel/InnerMargin/VBoxContainer/ControlsHelp" unique_id=1127091088]
 layout_mode = 2
 text = "0 - Reset Zoom"
 label_settings = SubResource("LabelSettings_small")
 
-[node name="Minimap" parent="." instance=ExtResource("2_minimap")]
+[node name="ToggleButtonContainer" type="MarginContainer" parent="." unique_id=891310746]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -120.0
+offset_top = 20.0
+offset_right = -20.0
+offset_bottom = 60.0
+grow_horizontal = 0
+
+[node name="ToggleButton" type="Button" parent="ToggleButtonContainer" unique_id=391310746 unique_name_in_owner="true"]
+layout_mode = 2
+text = "Close HUD"
+
+[node name="Minimap" parent="." unique_id=1333818951 instance=ExtResource("2_minimap")]
+offset_left = -172.0
+offset_top = 73.0
+offset_right = -22.0
+offset_bottom = 223.0
