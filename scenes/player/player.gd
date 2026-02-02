@@ -305,7 +305,6 @@ func _level_up() -> void:
 	
 	# Emit level up event
 	EventBus.player_leveled_up.emit(level)
-	EventBus.player_stats_changed.emit(self)
 	
 	# Play level up sound
 	levelup_sound.play()
