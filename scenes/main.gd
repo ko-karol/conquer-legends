@@ -2,23 +2,16 @@ extends Node2D
 
 # Main game scene controller
 
+var debug_mode = false
 @onready var camera: Camera2D = $Camera2D
 
-# Player reference
-var player: CharacterBody2D = null
-
-# Zoom settings
-const ZOOM_MIN = 0.5
+var player: CharacterBody2D
+@export var ZOOM_MIN = 0.5
 const ZOOM_MAX = 2.0
 const ZOOM_STEP = 0.1
 var current_zoom = 1.0
-
-# Screen shake
 var shake_amount = 0.0
 var shake_decay = 5.0
-
-# Debug mode
-var debug_mode = false  # Disable debug markers now that we have player
 var click_markers: Array = []
 const MAX_MARKERS = 10
 
@@ -161,6 +154,9 @@ func _process(delta: float) -> void:
 		# Spawn monsters near player
 		var player_world_pos = Isometric.iso_to_world(player.position)
 		GameManager.spawn_monsters_near_player(player_world_pos)
+		
+		# Cleanup distant monsters aggressively
+		GameManager.cleanup_distant_monsters(player_world_pos, 2500)
 	
 	if debug_mode:
 		queue_redraw()

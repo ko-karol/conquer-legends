@@ -45,13 +45,17 @@ var target_player: CharacterBody2D = null
 @onready var body_shape: Polygon2D = $Visual/Body
 @onready var shadow_shape: Polygon2D = $Visual/Shadow
 @onready var name_label: Label = $Visual/NameLabel
-@onready var health_bar_bg: ColorRect = $Visual/HealthBarBg
+@onready var health_bar: ColorRect = $Visual/HealthBar
 @onready var health_bar_fill: ColorRect = $Visual/HealthBarFill
 @onready var aggro_range: Area2D = $AggroRange
 @onready var attack_range: Area2D = $AttackRange
 
 # Selection state (no visual indicator)
 var is_selected: bool = false
+
+# AI throttling for distant monsters
+var ai_update_timer: float = 0.0
+var ai_update_interval: float = 0.0  # Will be set based on distance
 
 # Audio
 @onready var hit_sound: AudioStreamPlayer = $HitSound
@@ -130,12 +134,6 @@ func _setup_visuals() -> void:
 	# Setup name label
 	var stats = ConfigManager.get_monster_stats(monster_type)
 	name_label.text = stats.monster_name
-	
-	# Position UI elements above monster
-	var ui_y_offset = -size - 20
-	name_label.position.y = ui_y_offset - 20
-	health_bar_bg.position.y = ui_y_offset
-	health_bar_fill.position.y = ui_y_offset
 
 func _setup_collision() -> void:
 	# Body collision
@@ -164,8 +162,25 @@ func _physics_process(delta: float) -> void:
 	if current_state == State.DEAD:
 		return
 	
-	# Update health bar
-	_update_health_bar()
+	# Throttle AI updates based on distance to player
+	ai_update_timer += delta
+	var player = get_tree().get_first_node_in_group("player")
+	if player:
+		var distance_to_player = position.distance_to(player.position)
+		# Closer = more frequent updates
+		if distance_to_player < 500:
+			ai_update_interval = 0.0  # Every frame
+		elif distance_to_player < 1000:
+			ai_update_interval = 0.1  # 10 FPS
+		elif distance_to_player < 1500:
+			ai_update_interval = 0.2  # 5 FPS
+		else:
+			ai_update_interval = 0.5  # 2 FPS for very distant
+		
+		if ai_update_timer < ai_update_interval:
+			return
+	
+	ai_update_timer = 0.0
 	
 	# Update AI state machine
 	match current_state:
@@ -278,6 +293,9 @@ func take_damage(damage: float, is_crit: bool = false) -> void:
 		return
 	
 	hp = max(0, hp - damage)
+	
+	# Update health bar immediately on damage
+	_update_health_bar()
 	
 	# Emit damage event
 	EventBus.emit_damage(damage, self, null, is_crit)

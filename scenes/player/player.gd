@@ -185,6 +185,10 @@ func _physics_jumping(delta: float) -> void:
 		jump_z = 0
 		is_jumping = false
 		current_state = State.IDLE
+		
+		# Re-enable collision with monsters when landing
+		collision_mask = PhysicsLayers.MONSTERS | PhysicsLayers.PROJECTILES | PhysicsLayers.ENVIRONMENT
+		
 		_process_queued_action()
 	
 	# Update visual Y offset for jump height
@@ -232,6 +236,9 @@ func jump_to(world_target: Vector2) -> void:
 	# Calculate horizontal velocity to reach target during jump arc
 	var jump_time = 2.0 * player_config.jump_initial_vz / player_config.gravity
 	jump_horizontal_velocity = (jump_target_pos - jump_start_pos) / jump_time
+	
+	# Disable collision with monsters while jumping (jump over them)
+	collision_mask = PhysicsLayers.ENVIRONMENT
 	
 	is_jumping = true
 	current_state = State.JUMPING
@@ -396,8 +403,8 @@ func scatter_skill(world_target: Vector2) -> void:
 	# Spawn muzzle flash for scatter
 	_spawn_muzzle_flash()
 	
-	# Find all monsters within the fan cone
-	var monsters = get_tree().get_nodes_in_group("monsters")
+	# Find all monsters within the fan cone (use cached list from GameManager)
+	var monsters = GameManager.active_monsters
 	var valid_targets = []
 	
 	for monster in monsters:

@@ -19,7 +19,7 @@ func _ready() -> void:
 	# Create a large texture to cover the world
 	var img = Image.create(2048, 2048, false, Image.FORMAT_RGBA8)
 	img.fill(Color.WHITE)
-	texture = ImageTexture.create_from_image(img)
+	# texture = ImageTexture.create_from_image(img)
 	
 	# Center and scale to cover world
 	centered = true

@@ -27,7 +27,7 @@ var spawn_zones: Array = []
 
 # Active monsters tracker
 var active_monsters: Array = []
-var max_monsters: int = 1500
+var max_monsters: int = 800
 
 # Monster spawning
 var spawned_zones: Dictionary = {}  # Track monsters per zone
@@ -68,7 +68,7 @@ func _get_zone_config(distance: float) -> Dictionary:
 			"monster_types": [MonsterType.PHEASANT, MonsterType.TURTLEDOVE],
 			"level_min": 1,
 			"level_max": 5,
-			"density": 60
+			"density": 100
 		}
 	elif distance < 3000:
 		return {
@@ -76,7 +76,7 @@ func _get_zone_config(distance: float) -> Dictionary:
 			"monster_types": [MonsterType.TURTLEDOVE, MonsterType.ROBIN],
 			"level_min": 3,
 			"level_max": 8,
-			"density": 70
+			"density": 110
 		}
 	elif distance < 4500:
 		return {
@@ -84,7 +84,7 @@ func _get_zone_config(distance: float) -> Dictionary:
 			"monster_types": [MonsterType.ROBIN, MonsterType.BANDIT],
 			"level_min": 6,
 			"level_max": 12,
-			"density": 70
+			"density": 110
 		}
 	elif distance < 6000:
 		return {
@@ -92,7 +92,7 @@ func _get_zone_config(distance: float) -> Dictionary:
 			"monster_types": [MonsterType.BANDIT, MonsterType.BANDIT_L],
 			"level_min": 10,
 			"level_max": 18,
-			"density": 65
+			"density": 100
 		}
 	elif distance < 7500:
 		return {
@@ -100,7 +100,7 @@ func _get_zone_config(distance: float) -> Dictionary:
 			"monster_types": [MonsterType.BANDIT_L, MonsterType.APE],
 			"level_min": 15,
 			"level_max": 25,
-			"density": 60
+			"density": 90
 		}
 	elif distance < 9000:
 		return {
@@ -108,7 +108,7 @@ func _get_zone_config(distance: float) -> Dictionary:
 			"monster_types": [MonsterType.APE, MonsterType.APE_KING],
 			"level_min": 25,
 			"level_max": 40,
-			"density": 50
+			"density": 80
 		}
 	else:
 		return {
@@ -116,7 +116,7 @@ func _get_zone_config(distance: float) -> Dictionary:
 			"monster_types": [MonsterType.APE_KING],
 			"level_min": 40,
 			"level_max": 80,
-			"density": 40
+			"density": 70
 		}
 
 func get_zones_near_position(pos: Vector2, radius: float) -> Array:
@@ -163,14 +163,17 @@ func spawn_monsters_near_player(player_world_pos: Vector2) -> void:
 				alive_count += 1
 		
 		# Spawn monsters if below density
-		var target_count = int(zone["density"] * 0.5)  # Start with 50% density for testing
+		var target_count = int(zone["density"])  # Full density
 		var to_spawn = target_count - alive_count
 		
 		if to_spawn > 0 and get_monster_count() < max_monsters:
 			_spawn_monsters_in_zone(zone, to_spawn, zone_key)
 
 func _spawn_monsters_in_zone(zone: Dictionary, count: int, zone_key: String) -> void:
-	for i in range(count):
+	# Spawn max 10 monsters per frame to prevent lag spikes
+	var spawn_this_frame = min(count, 10)
+	
+	for i in range(spawn_this_frame):
 		if get_monster_count() >= max_monsters:
 			break
 		

@@ -1,15 +1,17 @@
 [gd_scene format=3 uid="uid://bcc1c613ljw65"]
 
-[ext_resource type="Script" path="res://scenes/projectiles/arrow.gd" id="1_arrow"]
+[ext_resource type="Script" uid="uid://8ecv7j483j6k" path="res://scenes/projectiles/arrow.gd" id="1_arrow"]
 
-[node name="Arrow" type="Area2D"]
+[node name="Arrow" type="Area2D" unique_id=461775152]
 collision_layer = 4
 collision_mask = 2
 script = ExtResource("1_arrow")
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=2097910470]
 
-[node name="Visual" type="Node2D" parent="."]
+[node name="Visual" type="Node2D" parent="." unique_id=1877539746]
 
-[node name="ArrowShape" type="Polygon2D" parent="Visual"]
+[node name="ArrowShape" type="Polygon2D" parent="Visual" unique_id=507664688]
+position = Vector2(13, -1)
 color = Color(0.9, 0.7, 0.3, 1)
+polygon = PackedVector2Array(-21, 3, -8, 5, -10, -3, -16, -1)

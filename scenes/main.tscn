@@ -1,13 +1,15 @@
 [gd_scene format=3 uid="uid://bxqvw8yc5qswu"]
 
 [ext_resource type="Script" uid="uid://c2jxglb2giwul" path="res://scenes/main.gd" id="1_main"]
-[ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="2_hud"]
+[ext_resource type="PackedScene" path="res://scenes/ui/xp_bar.tscn" id="2_xpbar"]
 [ext_resource type="Script" uid="uid://b6ufcg6qpuc8t" path="res://scenes/floor/floor.gd" id="3_floor"]
 [ext_resource type="PackedScene" uid="uid://c4qvw8yc5qsxy" path="res://scenes/player/player.tscn" id="4_jyhfs"]
 [ext_resource type="PackedScene" uid="uid://bc1c613ljw68" path="res://scenes/monsters/monster.tscn" id="5_tbgi4"]
+[ext_resource type="PackedScene" uid="uid://c7vp7yxqgqxo3" path="res://scenes/ui/hud.tscn" id="6_hud"]
 
 [node name="Main" type="Node2D" unique_id=623160555]
 script = ExtResource("1_main")
+ZOOM_MIN = 1.0
 
 [node name="Floor" type="Sprite2D" parent="." unique_id=1242960196]
 z_index = -100
@@ -15,10 +17,12 @@ script = ExtResource("3_floor")
 
 [node name="Camera2D" type="Camera2D" parent="." unique_id=972279906]
 
-[node name="HUD" parent="." unique_id=1963526738 instance=ExtResource("2_hud")]
+[node name="XPBar" parent="." unique_id=16830695 instance=ExtResource("2_xpbar")]
 
 [node name="Player" parent="." unique_id=1619409908 instance=ExtResource("4_jyhfs")]
 position = Vector2(-102, 149)
 
 [node name="Monster" parent="." unique_id=1898215015 instance=ExtResource("5_tbgi4")]
-position = Vector2(-328, 22)
+position = Vector2(-316, 55)
+
+[node name="HUD" parent="." unique_id=1230873900 instance=ExtResource("6_hud")]
